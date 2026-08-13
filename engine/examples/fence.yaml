@@ -1,0 +1,35 @@
+# fence.yaml · agent "ops-agent" · attack surface as code
+# Each agent declares what it may touch, its max impact, and its data domains.
+# Anything beyond this map is out of scope; the gate blocks releases that drift.
+
+policies:
+  - agent: ops-agent
+    allow_tool:
+      - read.docs
+      - search
+      - github.read
+    deny_tool:
+      - db.write
+      - exec.shell
+    impact_max: readonly
+    data_domains:
+      - sandbox::*
+    on_deny:
+      - alert
+      - human_review
+
+  - agent: researcher
+    allow_tool:
+      - read.docs
+      - search
+      - github.read
+      - docs.write
+    deny_tool:
+      - db.write
+      - exec.shell
+    impact_max: write
+    data_domains:
+      - sandbox::*
+      - docs::*
+    on_deny:
+      - alert
