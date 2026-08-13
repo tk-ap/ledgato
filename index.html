@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledgato — An unverified agent doesn't ship</title>
+<meta name="description" content="Ledgato maps what your AI agents can actually access, probes those boundaries with adversarial attacks, and gates every release with signed, tamper-evident evidence for each check.">
+<link rel="canonical" href="https://tk-ap.github.io/ledgato/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
+<style>
+  :root{
+    --bg:#05070d;
+    --bg2:#0a0e18;
+    --bg3:#0e1424;
+    --panel:#0c1120;
+    --line:rgba(255,255,255,.08);
+    --line2:rgba(120,255,220,.22);
+    --text:#e7ecf4;
+    --muted:#8b95ab;
+    --muted2:#5c6679;
+    --cyan:#38f0d0;
+    --cyan2:#7df6e4;
+    --cyan-dim:rgba(56,240,208,.12);
+    --amber:#ffc44d;
+    --violet:#8b8bff;
+    --danger:#ff6b6b;
+    --ok:#4ade80;
+    --radius:16px;
+    --maxw:1180px;
+    --font:'Inter',system-ui,-apple-system,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:rgba(56,240,208,.25)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+
+  /* ambient bg grid */
+  .grid-bg{position:fixed;inset:0;z-index:-2;
+    background-image:linear-gradient(rgba(56,240,208,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(56,240,208,.04) 1px,transparent 1px);
+    background-size:46px 46px;
+    mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 30%,transparent 75%);
+  }
+  .glow{position:fixed;z-index:-1;filter:blur(90px);opacity:.55;pointer-events:none}
+  .glow.g1{width:560px;height:560px;background:radial-gradient(circle,rgba(56,240,208,.25),transparent 70%);top:-160px;left:-100px}
+  .glow.g2{width:520px;height:520px;background:radial-gradient(circle,rgba(139,139,255,.18),transparent 70%);top:20px;right:-160px}
+  .glow.g3{width:500px;height:500px;background:radial-gradient(circle,rgba(255,196,77,.12),transparent 70%);bottom:-120px;left:30%}
+
+  /* typography */
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--cyan);display:inline-flex;align-items:center;gap:8px}
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--cyan)}
+  h1{font-size:clamp(2.3rem,5.4vw,4rem);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:20px 0}
+  h1 .grad{background:linear-gradient(90deg,var(--cyan2),var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(1.05rem,1.6vw,1.25rem);color:var(--muted);max-width:640px}
+  h2{font-size:clamp(1.7rem,3.4vw,2.5rem);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-bottom:14px}
+  .center{text-align:center}
+  .center .sub{margin:0 auto}
+  .muted{color:var(--muted)}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15px;padding:13px 24px;border-radius:12px;border:1px solid transparent;cursor:pointer;transition:.2s;white-space:nowrap}
+  .btn-primary{background:linear-gradient(135deg,var(--cyan),#1fbca3);color:#03201b;box-shadow:0 8px 30px -8px rgba(56,240,208,.6)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px -8px rgba(56,240,208,.75)}
+  .btn-ghost{background:rgba(255,255,255,.03);border-color:var(--line);color:var(--text)}
+  .btn-ghost:hover{border-color:var(--line2);background:rgba(56,240,208,.06)}
+  .btn-sm{padding:9px 16px;font-size:14px}
+  .btn-mono{font-family:var(--mono);font-size:13px}
+
+  /* nav */
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(5,7,13,.7);border-bottom:1px solid var(--line);transition:.25s}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:68px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.02em}
+  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--cyan),#1ea3e0);display:grid;place-items:center;position:relative}
+  .logo svg{width:16px;height:16px;stroke:#03201b;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .nav-links{display:flex;gap:30px;align-items:center}
+  .nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:.2s}
+  .nav-links a:hover{color:var(--text)}
+  .nav-cta{display:flex;gap:12px;align-items:center}
+  .hamb{display:none;background:none;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 10px;cursor:pointer}
+
+  /* hero */
+  .hero{padding:76px 0 40px;position:relative}
+  .hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
+  .badge{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line2);background:var(--cyan-dim);color:var(--cyan2);font-family:var(--mono);font-size:12.5px;padding:7px 14px;border-radius:999px;margin-bottom:22px}
+  .badge .dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .hero-btns{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+  .hero-note{margin-top:22px;color:var(--muted2);font-family:var(--mono);font-size:12.5px}
+
+  /* hero visual: agent containment diagram */
+  .viz{position:relative;border-radius:var(--radius);border:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),var(--panel));overflow:hidden;box-shadow:0 40px 90px -40px rgba(0,0,0,.8)}
+  .viz::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(56,240,208,.08),transparent 60%)}
+  .viz-top{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .vdot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px}
+  .viz-body{padding:26px 22px;position:relative}
+  .controller{border:1px dashed var(--line2);border-radius:12px;padding:16px;background:rgba(56,240,208,.05);text-align:center;position:relative;margin-bottom:24px}
+  .controller .ctitle{font-weight:700;color:var(--cyan2);letter-spacing:.01em}
+  .controller .csub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+  .agents{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+  .agent{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel);text-align:center;position:relative}
+  .agent .aicon{width:26px;height:26px;margin:0 auto 8px;border-radius:7px;background:linear-gradient(135deg,#25324d,#1a2233);display:grid;place-items:center}
+  .agent .aicon svg{width:14px;height:14px;stroke:var(--cyan);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .agent .aname{font-family:var(--mono);font-size:11.5px;color:var(--text);font-weight:500}
+  .agent .arole{font-family:var(--mono);font-size:10px;color:var(--muted2)}
+  .agent .astatus{position:absolute;top:8px;right:8px;width:7px;height:7px;border-radius:50%}
+  .astatus.ok{background:var(--ok,#4ade80);box-shadow:0 0 8px var(--ok,#4ade80)}
+  .boundary{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line2);border-radius:12px;padding:12px 16px;background:rgba(56,240,208,.04);font-family:var(--mono);font-size:11.5px;color:var(--cyan2)}
+  .boundary .bcount{color:var(--muted)}
+  .boundary .btag{background:var(--cyan-dim);border:1px solid var(--line2);padding:3px 9px;border-radius:6px}
+  .tools{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-top:16px}
+  .tool{border:1px solid var(--line);border-radius:8px;padding:9px 6px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--panel)}
+  .tool.denied{color:var(--danger);border-color:rgba(255,107,107,.4);position:relative}
+  .tool.denied::after{content:"⛔";position:absolute;top:-7px;right:-5px;font-size:11px}
+  .feed{margin-top:16px;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-family:var(--mono);font-size:11px}
+  .feed .fr{display:flex;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line)}
+  .feed .fr:last-child{border-bottom:none}
+  .feed .time{color:var(--muted2);flex:none}
+  .feed .tag{flex:none;font-size:10px;padding:1px 7px;border-radius:4px}
+  .tag.verify{background:rgba(74,222,128,.14);color:var(--ok,#4ade80)}
+  .tag.block{background:rgba(255,107,107,.16);color:var(--danger)}
+  .feed .msg{color:var(--muted)}
+  .feed .msg b{color:var(--text);font-weight:600}
+  .feed .evidence{color:var(--cyan2)}
+  @keyframes blink{50%{opacity:0}}
+  .cursor{display:inline-block;width:7px;height:12px;background:var(--cyan);vertical-align:-2px;animation:blink 1s infinite}
+
+  /* logos */
+  .logos{padding:40px 0 20px}
+  .logos p{text-align:center;color:var(--muted2);font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:26px}
+  .logo-row{display:flex;justify-content:center;gap:clamp(26px,6vw,64px);align-items:center;flex-wrap:wrap;opacity:.55}
+  .logo-row span{font-weight:700;letter-spacing:.02em;color:var(--muted);font-size:17px;font-family:var(--font)}
+  .logo-row span em{font-style:normal;color:var(--muted2)}
+
+  /* section spacing */
+  section{padding:84px 0}
+  .section-head{max-width:680px;margin-bottom:52px}
+
+  /* problem / solution */
+  .ps{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+  .ps-col h3{font-size:19px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+  .ps-col .tag-ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:14px}
+  .ps-col.risk .tag-ic{background:rgba(255,107,107,.14);color:var(--danger)}
+  .ps-col.solve .tag-ic{background:var(--cyan-dim);color:var(--cyan)}
+  .risk-list{list-style:none}
+  .risk-list li{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line);align-items:flex-start}
+  .risk-list li .x{flex:none;color:var(--danger);font-weight:700;margin-top:1px}
+  .risk-list li b{display:block;font-weight:600;font-size:15px}
+  .risk-list li span{color:var(--muted);font-size:14px}
+  .solve-box{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);padding:22px;margin-bottom:14px}
+  .solve-box .k{font-family:var(--mono);color:var(--cyan2);font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+  .solve-box p{font-size:14.5px;color:var(--muted)}
+
+  /* how it works */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;counter-reset:step}
+  .step{border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:linear-gradient(180deg,var(--panel),var(--bg));position:relative}
+  .step::before{counter-increment:step;content:"0" counter(step);position:absolute;top:20px;right:22px;font-family:var(--mono);font-size:34px;font-weight:600;color:rgba(56,240,208,.16)}
+  .step .sic{width:44px;height:44px;border-radius:11px;background:var(--cyan-dim);border:1px solid var(--line2);display:grid;place-items:center;margin-bottom:18px}
+  .step .sic svg{width:22px;height:22px;stroke:var(--cyan);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .step h4{font-size:17px;font-weight:700;margin-bottom:8px}
+  .step p{color:var(--muted);font-size:14.5px}
+
+  /* features */
+  .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .feat{border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:var(--panel);transition:.25s;position:relative}
+  .feat:hover{transform:translateY(-4px);border-color:var(--line2);background:#0d1424}
+  .feat .fic{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);display:grid;place-items:center;margin-bottom:16px}
+  .feat .fic svg{width:20px;height:20px;stroke:var(--cyan);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .feat h4{font-size:16.5px;font-weight:700;margin-bottom:8px}
+  .feat p{color:var(--muted);font-size:14px}
+  .feat .mono{font-family:var(--mono);font-size:11px;color:var(--cyan2);display:inline-block;margin-top:14px;background:var(--cyan-dim);padding:4px 10px;border-radius:6px}
+
+  /* verification pipeline bar */
+  .pipeline{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:30px;margin-top:52px;font-family:var(--mono);font-size:12px}
+  .pipe-flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;justify-content:center}
+  .pipe-node{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:12px 16px;text-align:center;flex:1;min-width:120px;position:relative}
+  .pipe-node .t{font-family:var(--mono);color:var(--cyan2);font-weight:600;display:block;margin-bottom:2px}
+  .pipe-node .d{color:var(--muted2);font-size:10.5px}
+  .pipe-arrow{align-self:center;color:var(--muted2);font-size:16px}
+  .pipe-code{margin-top:22px;background:#04070d;border:1px solid var(--line);border-radius:10px;padding:18px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.8;color:#9fb3c8}
+  .pipe-code .k{color:var(--violet)}.pipe-code .c{color:var(--cyan)}.pipe-code .n{color:var(--amber)}.pipe-code .s{color:#7ee08e}.pipe-code .cm{color:var(--muted2)}
+
+  /* verify strip */
+  .verify-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px}
+  .verify-strip .vs{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--panel)}
+  .vs .n{font-family:var(--mono);font-size:24px;font-weight:600;color:var(--cyan2);display:block}
+  .vs .l{font-size:13px;color:var(--muted)}
+
+  /* split features */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+  .check-list{list-style:none;margin-top:10px}
+  .check-list li{display:flex;gap:12px;padding:11px 0;align-items:flex-start;border-bottom:1px solid var(--line)}
+  .check-list li:last-child{border-bottom:none}
+  .check-list .tick{flex:none;width:22px;height:22px;border-radius:50%;background:var(--cyan-dim);border:1px solid var(--line2);display:grid;place-items:center;margin-top:2px}
+  .check-list .tick svg{width:12px;height:12px;stroke:var(--cyan);fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+  .check-list b{font-weight:600;font-size:15px;display:block}
+  .check-list span{color:var(--muted);font-size:14px}
+
+  /* terminal */
+  .terminal{border:1px solid var(--line);border-radius:var(--radius);background:#04070d;overflow:hidden;font-family:var(--mono);font-size:12.5px;box-shadow:0 30px 70px -30px rgba(0,0,0,.8)}
+  .term-top{display:flex;gap:7px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .term-top .tdot{width:11px;height:11px;border-radius:50%}
+  .term-title{margin-left:10px;color:var(--muted2);font-size:11px}
+  .term-body{padding:20px;line-height:1.9;color:#9fb3c8}
+  .term-body .pr{color:var(--cyan)}
+  .term-body .ok{color:var(--ok,#4ade80)}
+  .term-body .warn{color:var(--amber)}
+  .term-body .err{color:var(--danger)}
+
+  /* pricing */
+  .pricing-switch{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:44px;font-size:14px;color:var(--muted)}
+  .pricing-switch .save{background:var(--cyan-dim);color:var(--cyan2);font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:999px;border:1px solid var(--line2)}
+  .switch{width:52px;height:28px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid var(--line);position:relative;cursor:pointer;transition:.25s}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--cyan);transition:.25s}
+  .switch.on{background:var(--cyan-dim);border-color:var(--line2)}
+  .switch.on::after{left:27px}
+  .plans{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
+  .plan{border:1px solid var(--line);border-radius:var(--radius);padding:30px;background:var(--panel);display:flex;flex-direction:column;position:relative}
+  .plan.popular{border-color:var(--line2);background:linear-gradient(180deg,#0d1a22,#0c1120);box-shadow:0 0 0 1px rgba(56,240,208,.25),0 30px 70px -40px rgba(56,240,208,.35)}
+  .plan.popular .pop-tag{position:absolute;top:-14px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--cyan),#1ea3e0);color:#03201b;font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 16px;border-radius:999px;letter-spacing:.06em}
+  .plan .pname{font-size:15px;font-weight:700;letter-spacing:.02em}
+  .plan .pdesc{color:var(--muted);font-size:13.5px;margin:6px 0 22px}
+  .plan .price{display:flex;align-items:baseline;gap:4px}
+  .plan .price .amt{font-size:44px;font-weight:800;letter-spacing:-.03em}
+  .plan .price .per{color:var(--muted);font-size:14px}
+  .plan .pmonth{color:var(--muted2);font-size:12.5px;margin-top:6px}
+  .plan ul{list-style:none;margin:26px 0 30px;flex:1}
+  .plan ul li{display:flex;gap:10px;padding:8px 0;font-size:14px;color:var(--muted);align-items:flex-start}
+  .plan ul li .tick{flex:none;color:var(--cyan);margin-top:1px}
+  .plan .btn{justify-content:center;margin-top:auto}
+
+  /* testimonials */
+  .quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .quote{border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:var(--panel);display:flex;flex-direction:column}
+  .quote .stars{color:var(--amber);letter-spacing:2px;font-size:14px;margin-bottom:14px}
+  .quote p{font-size:14.5px;color:var(--text);flex:1}
+  .quote .who{display:flex;align-items:center;gap:12px;margin-top:20px}
+  .quote .ava{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:14px;color:#03201b}
+  .quote .who b{display:block;font-size:13.5px}
+  .quote .who span{font-size:12px;color:var(--muted)}
+
+  /* compliance */
+  .comp{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:34px}
+  .comp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:8px}
+  .comp-item{text-align:center;padding:14px}
+  .comp-item .ci{font-size:26px;margin-bottom:6px}
+  .comp-item b{font-size:14px;font-weight:600;display:block}
+  .comp-item span{font-size:12px;color:var(--muted)}
+
+  /* FAQ */
+  .faq{max-width:760px;margin:0 auto}
+  .faq-item{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;background:var(--panel);overflow:hidden}
+  .faq-q{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;cursor:pointer;font-weight:600;font-size:16px;gap:16px}
+  .faq-q .chev{flex:none;transition:.25s;color:var(--muted)}
+  .faq-item.open .chev{transform:rotate(180deg);color:var(--cyan)}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .faq-a p{padding:0 24px 22px;color:var(--muted);font-size:14.5px}
+
+  /* cta */
+  .cta-band{position:relative;overflow:hidden;border:1px solid var(--line2);border-radius:24px;background:linear-gradient(135deg,var(--cyan-dim),rgba(139,139,255,.06));padding:64px 40px;text-align:center}
+  .cta-band h2{font-size:clamp(1.8rem,3.6vw,2.7rem)}
+  .cta-btns{display:flex;gap:14px;justify-content:center;margin-top:30px;flex-wrap:wrap}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:56px 0 40px;margin-top:60px}
+  .foot-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:40px}
+  .foot-grid .brand{margin-bottom:14px}
+  .foot-grid p{color:var(--muted);font-size:13.5px;max-width:300px}
+  .foot-col h5{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);margin-bottom:16px}
+  .foot-col a{display:block;color:var(--muted);font-size:14px;padding:6px 0;transition:.2s}
+  .foot-col a:hover{color:var(--text)}
+  .foot-bottom{border-top:1px solid var(--line);margin-top:44px;padding-top:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;color:var(--muted2);font-size:13px}
+  .foot-bottom .mono{font-family:var(--mono)}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+
+  @media(max-width:1020px){
+    .hero .wrap,.ps,.split{grid-template-columns:1fr;gap:40px}
+    .feats,.steps,.plans,.quotes,.verify-strip,.comp-grid{grid-template-columns:repeat(2,1fr)}
+    .foot-grid{grid-template-columns:1fr 1fr}
+    .pipe-arrow{display:none}
+  }
+  @media(max-width:720px){
+    .nav-links,.nav-cta .btn:not(.btn-cta-mobile){display:none}
+    .hamb{display:block}
+    .feats,.steps,.quotes,.verify-strip,.comp-grid,.plans{grid-template-columns:1fr}
+    .foot-grid{grid-template-columns:1fr}
+    .agents{grid-template-columns:repeat(3,1fr)}
+    .tools{grid-template-columns:repeat(3,1fr)}
+    section{padding:64px 0}
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="glow g1"></div>
+<div class="glow g2"></div>
+<div class="glow g3"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="wrap main-inner">
+    <a class="brand" href="#top">
+      <span class="logo"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 4-3 7-8 8-5-1-8-4-8-8V7z"/><path d="M12 8v5"/></svg></span>
+      Ledgato
+    </a>
+    <div class="nav-links">
+      <a href="#product">Product</a>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#docs">Docs</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-cta">
+      <a href="#signup" class="btn btn-ghost btn-sm btn-mono">Sign in</a>
+      <a href="#signup" class="btn btn-primary btn-sm btn-cta-mobile">Gate a release</a>
+      <button class="hamb" onclick="toggleMenu()" aria-label="menu">☰</button>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <div class="badge"><span class="dot"></span> adversarial probing · signed evidence · drift blocking</div>
+      <h1>An unverified agent <span class="grad">doesn't ship.</span></h1>
+      <p class="sub">Ledgato maps what your AI agents can actually access, attacks those boundaries with adversarial probes, and gates every release — blocking anything unverified or drifted from reaching production, with signed evidence for each check.</p>
+      <div class="hero-btns">
+        <a href="#signup" class="btn btn-primary">Gate a release</a>
+        <a href="#security" class="btn btn-ghost btn-mono">See signed evidence</a>
+      </div>
+      <p class="hero-note">// maps access · probes boundaries · signs every check · gates the release</p>
+    </div>
+
+    <div class="viz">
+      <div class="viz-top"><span><span class="vdot" style="background:#ff6b6b"></span><span class="vdot" style="background:#ffc44d"></span><span class="vdot" style="background:#4ade80"></span> ledgato-release.log</span><span>LIVE</span></div>
+      <div class="viz-body">
+        <div class="controller">
+          <div class="ctitle">◈ LEDGATO RELEASE GATE</div>
+          <div class="csub">attack-surface map · probes · signed attestations</div>
+        </div>
+        <div class="agents">
+          <div class="agent"><div class="aicon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div><div class="aname">researcher</div><div class="arole">read-only</div><span class="astatus ok"></span></div>
+          <div class="agent"><div class="aicon"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div><div class="aname">autopilot</div><div class="arole">staging</div><span class="astatus ok"></span></div>
+          <div class="agent"><div class="aicon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 12h18"/></svg></div><div class="aname">ops-agent</div><div class="arole">scoped</div><span class="astatus ok"></span></div>
+        </div>
+        <div class="boundary"><span class="rightcount">containment boundary</span><span class="spTag">17 tools in scope</span><span class="rightcount">3 agents · 1 tenant</span></div>
+        <div class="tools">
+          <div class="tool">search</div>
+          <div class="tool">docs</div>
+          <div class="tool">slack</div>
+          <div class="tool denied">db.write</div>
+          <div class="tool">billing</div>
+          <div class="tool">github</div>
+        </div>
+        <div class="feed">
+          <div class="fr"><span class="time">00:00:12</span><span class="tag verify">VERIFY</span><span class="msg">action <b>github.push</b> inside scope → <b>allowed</b></span></div>
+          <div class="fr"><span class="time">00:00:31</span><span class="tag block">BLOCK</span><span class="msg"><b>db.write</b> outside scope for <b>researcher</b> · denied + alert</span></div>
+          <div class="fr"><span class="time">00:01:04</span><span class="tag verify">VERIFY</span><span class="msg">evidence <b>#9f31…c2</b> sealed → ledger<span class="cursor"></span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- LOGOS -->
+<div class="logos">
+  <div class="wrap">
+    <p>Trusted by agent teams shipping at scale</p>
+    <div class="logo-row">
+      <span>Meridian<em>.</em></span><span>Forge<em>.</em></span><span>Northwind<em>.</em></span><span>Halcyon<em>.</em></span><span>Coretto<em>.</em></span><span>Praxis<em>.</em></span>
+    </div>
+  </div>
+</div>
+
+<!-- PROBLEM / SOLUTION -->
+<section id="product">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The problem &amp; the fix</span>
+      <h2>A one-time audit is not enough.</h2>
+      <p class="sub">Agents are autonomous by design — they act, explore, and improvise. By the time you audit the logs, the damage is done. You need verification <em>at the moment of action</em>, not after the fact.</p>
+    </div>
+    <div class="ps">
+      <div class="ps-col risk">
+        <h3><span class="tag-ic">⚠</span> What breaks without it</h3>
+        <ul class="risk-list">
+          <li><span class="x">✕</span><div><b>Scope drift</b><span>Agents subtly expand permissions as context grows — today "read only," tomorrow writes.</span></div></li>
+          <li><span class="x">✕</span><div><b>Prompt-injection exposure</b><span>Untrusted inputs steer agents into privileged actions the human never sanctioned.</span></div></li>
+          <li><span class="x">✕</span><div><b>Data exfiltration attempts</b><span>A single mis-scoped write or exfiltration path leaks production data.</span></div></li>
+          <li><span class="x">✕</span><div><b>Invisible blast radius</b><span>No per-action evidence means no forensics, no accountability, no regression testing.</span></div></li>
+          <li><span class="x">✕</span><div><b>Compliance theater</b><span>Quarterly reviews that can't prove what your agents actually did yesterday.</span></div></li>
+        </ul>
+      </div>
+      <div class="ps-col solve">
+        <h3><span class="tag-ic">✓</span> What Ledgato gates before it ships</h3>
+        <div class="solve-box"><div class="k">Scope conformance</div><p>Every action is checked against the agent's declared scope before it's allowed — tools, data domains, destinations, and impact levels.</p></div>
+        <div class="solve-box"><div class="k">Boundary enforcement</div><p>Out-of-scope actions are denied in real time, with automated alerts, rollback hooks, and human-in-the-loop gates when configured.</p></div>
+        <div class="solve-box"><div class="k">Proof &amp; replay</div><p>Every verified action emits tamper-evident evidence. Replay any agent's behavior, prove compliance, investigate instantly.</p></div>
+        <div class="solve-box"><div class="k">Drift &amp; anomaly</div><p>Continuous baseline comparison flags permission creep, unusual call patterns, and injection attempts the moment they appear.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow" style="justify-content:center">How it works</span>
+      <h2>Containment, verified as a release gate</h2>
+      <p class="sub">Ledgato maps what your agents can actually reach, probes those boundaries, and won't let anything unverified ship. Every gate produces signed evidence.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="s"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 4-4 7-8 8-4-1-8-4-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h4>Map what agents can access</h4>
+        <p>Ledgato maps every tool, data domain, and endpoint each agent can actually reach — a versioned, reviewable attack-surface map built before anything deploys.</p>
+      </div>
+      <div class="step">
+        <div class="s"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12h4M18 12h4M12 2v4M12 18v4"/></svg></div>
+        <h4>Probe &amp; sign every check</h4>
+        <p>Adversarial probes attack the map — injection, escalation, exfiltration — and each result is written as a signed, tamper-evident attestation. Proof, not screenshots.</p>
+      </div>
+      <div class="step">
+        <div class="s"><svg viewBox="0 0 24 24"><path d="M7 3v18M17 3v18M3 7h18M3 17h18"/><path d="M7 12h10"/></svg></div>
+        <h4>Gate the release</h4>
+        <p>If the live map drifts from what was verified, the release is blocked. Nothing ships until every gate is signed and approved — with evidence to prove it.</p>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-flow">
+        <div class="pipe-node"><span class="t">Agent</span><span class="d">intent</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node"><span class="t">Action call</span><span class="d">capture</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node"><span class="t">Ledgato check</span><span class="d">map · probes · scope</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node"><span class="t">Sign &amp; gate</span><span class="d">signed · approve · gate</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node"><span class="t">Attestation</span><span class="d">ledger + alert</span></div>
+      </div>
+      <div class="pipe-code">
+<span class="cm">// fence.yaml · agent "ops-agent" · attack surface as code</span>
+<span class="k">scope</span> <span class="n">"ops-agent"</span> {
+  <span class="k">allow_tool</span> <span class="s">"read.docs"</span>
+  <span class="k">allow_tool</span> <span class="s">"search"</span>
+  <span class="k">allow_tool</span> <span class="s">"github.read"</span>
+  <span class="k">deny_tool</span>  <span class="s">"db.write"</span>            <span class="cm"># outside scope</span>
+  <span class="k">impact_max</span>  <span class="n">"readonly"</span>
+  <span class="k">data_domains</span> <span class="s">["sandbox::*"]</span>
+  <span class="k">on_deny</span> <span class="s">"alert + human_review"</span>
+}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow" style="justify-content:center">Capabilities</span>
+      <h2>Everything your agents need to stay contained</h2>
+      <p class="sub">A single layer that verifies, enforces, and proves — without slowing your agents down.</p>
+    </div>
+    <div class="feats">
+      <div class="feat">
+        <div class="fic"><svg viewBox="0 0 24 24"><path d="M4 19V5M8 19v-6M12 19V9M16 19v-8M20 19V3"/></svg></div>
+        <h4>Per-agent scopes as code</h4>
+        <p>Declare boundaries per agent, per role, per tenant. Versioned, reviewable, and enforced everywhere your agents run.</p>
+        <span class="mono">fence.yaml</span>
+      </div>
+      <div class="feat">
+        <div class="fic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 4-4 7-8 8-4-1-8-4-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h4>Realtime boundary enforcement</h4>
+        <p>Millisecond decisioning at every action. In-scope flows through; out-of-scope is denied, gated, or escalated to a human.</p>
+        <span class="mono">~4ms overhead</span>
+      </div>
+      <div class="feat">
+        <div class="fic"><svg viewBox="0 0 24 24"><path d="M12 17a5 5 0 100-10 5 5 0 000 10z"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M19.8 4.2L17 7M7 17l-2.8 2.8"/></svg></div>
+        <h4>Prompt-injection detection</h4>
+        <p>Models actions against intent and context to catch untrusted inputs steering your agent into privileged territory.</p>
+        <span class="mono">injection-aware</span>
+      </div>
+      <div class="feat">
+        <div class="fic"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div>
+        <h4>Tamper-evident evidence</h4>
+        <p>Every decision is sealed into an append-only, hash-chained ledger — replayable, auditable, court-ready evidence.</p>
+        <span class="mono">sha-256 chained</span>
+      </div>
+      <div class="feat">
+        <div class="fic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+        <h4>Drift &amp; anomaly detection</h4>
+        <p>Continuous baselining flags permission creep, unusual call patterns, and abnormal data flows the instant they appear.</p>
+        <span class="mono">baseline diff</span>
+      </div>
+      <div class="feat">
+        <div class="fic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 4-3 7-8 8-5-1-8-4-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h4>Human-in-the-loop gates</h4>
+        <p>Route high-impact actions to approval queues with full context — so humans stay in control of the boundary.</p>
+        <span class="mono">approval queues</span>
+      </div>
+    </div>
+
+    <div class="verify-strip reveal">
+      <div class="vs"><span class="n">100%</span><span class="l">of releases gated &amp; signed</span></div>
+      <div class="vs"><span class="n">0</span><span class="l">unverified agents slip through</span></div>
+      <div class="vs"><span class="n">&lt;5ms</span><span class="l">per signed attestation</span></div>
+      <div class="vs"><span class="n">24/7</span><span class="l">continuous, not quarterly</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- SPLIT: LIVE OBSERVABILITY -->
+<section>
+  <div class="wrap split">
+    <div>
+      <span class="eyebrow">Observe in real time</span>
+      <h2>Watch the boundary hold, live</h2>
+      <p class="sub">A live command view of every agent, every scope, every decision. Filter by agent, tool, outcome, or tenant.</p>
+      <ul class="check-list">
+        <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><div><b>Per-agent containment state</b><span>See exactly what each agent may touch, and what it has touched.</span></div></li>
+        <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><div><b>Every denial explained</b><span>Out-of-scope attempts surfaced with reason, evidence, and next steps.</span></div></li>
+        <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><div><b>Provenance, prompt to write</b><span>Trace any action back to the exact instruction that produced it.</span></div></li>
+        <li><span class="tick"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></span><div><b>Export-ready reports</b><span>SOC 2, ISO 27001, and internal review formats in one click.</span></div></li>
+      </ul>
+    </div>
+    <div class="terminal">
+      <div class="term-top"><span class="tdot" style="background:#ff6b6b"></span><span class="tdot" style="background:#ffc44d"></span><span class="tdot" style="background:#4ade80"></span><span class="term-title">ledgato attestation</span></div>
+      <div class="term-body">
+<span class="pr">$</span> ledgato attestation --agent researcher --release v2.4<br>
+<span class="cm"># gating release v2.4 · 3 agents · attack surface signed</span><br>
+[<span class="ok">SIGN </span>] 00:00:12 github.read <span class="ok">verified</span> · attestation #9f31…c2<br>
+[<span class="ok">SIGN </span>] 00:00:31 docs.write <span class="ok">verified</span> · attestation #41ab…77<br>
+[<span class="warn">DRIFT</span>] 00:00:44 researcher gained <b>db.write</b> · <span class="warn">map changed</span><br>
+[<span class="err">GATE </span>] 00:00:45 release v2.4 <span class="err">blocked</span> · not re-verified + alert<span class="cursor"></span><br>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST / COMPLIANCE -->
+<section id="security">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow" style="justify-content:center">Built for trust</span>
+      <h2>Proof you can take to auditors</h2>
+      <p class="sub">Continuous verification means your compliance evidence is always current — never a point-in-time snapshot.</p>
+    </div>
+    <div class="comp reveal">
+      <div class="comp-grid">
+        <div class="comp-item"><div class="ci">🔐</div><b>SOC 2 Type II</b><span>Signed attestation</span></div>
+        <div class="comp-item"><div class="ci">🗂️</div><b>Attestation ledger</b><span>Append-only &amp; hash-chained</span></div>
+        <div class="comp-item"><div class="ci">🔑</div><b>Zero-knowledge</b><span>Scopes never leave your VPC</span></div>
+        <div class="comp-item"><div class="ci">🌐</div><b>SSO / SCIM</b><span>SAML, OIDC, RBAC</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow" style="justify-content:center">Pricing</span>
+      <h2>Scale with the risk you contain</h2>
+      <p class="sub">Start free. Pay as your agent fleet and evidence volume grow.</p>
+    </div>
+    <div class="pricing-switch">
+      <span>Monthly</span>
+      <div class="switch" id="priceSwitch" onclick="toggleBilling()"></div>
+      <span>Annual <span class="save">save 20%</span></span>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <div class="pname">Developer</div>
+        <div class="pdesc">For one team wrapping its first agents.</div>
+        <div class="price"><span class="amt" data-monthly="0" data-annual="0">$0</span><span class="per">/mo</span></div>
+        <div class="pmonth">free forever · up to 3 agents</div>
+        <ul>
+          <li><span class="tick">✓</span>3 agents &amp; 1 tenant</li>
+          <li><span class="tick">✓</span>Scope as code</li>
+          <li><span class="tick">✓</span>Realtime enforcement</li>
+          <li><span class="tick">✓</span>Evidence ledger (30-day)</li>
+          <li><span class="tick">✓</span>Community support</li>
+        </ul>
+        <a href="#signup" class="btn btn-ghost">Start free</a>
+      </div>
+      <div class="plan popular">
+        <span class="pop-tag">MOST POPULAR</span>
+        <div class="pname">Scale</div>
+        <div class="pdesc">For production fleets that need guarantees.</div>
+        <div class="price"><span class="amt" data-monthly="149" data-annual="119">$149</span><span class="per">/mo</span></div>
+        <div class="pmonth" data-monthly-label="per month · 50 agents · 1M actions" data-annual-label="billed annually · 50 agents · 1M actions">per month · 50 agents · 1M actions</div>
+        <ul>
+          <li><span class="tick">✓</span>Everything in Developer</li>
+          <li><span class="tick">✓</span>Up to 50 agents &amp; 5 tenants</li>
+          <li><span class="tick">✓</span>Human-in-the-loop gates</li>
+          <li><span class="tick">✓</span>Drift &amp; injection detection</li>
+          <li><span class="tick">✓</span>1-year evidence retention</li>
+          <li><span class="tick">✓</span>SSO &amp; RBAC</li>
+          <li><span class="tick">✓</span>Priority support</li>
+        </ul>
+        <a href="#signup" class="btn btn-primary">Gate a release</a>
+      </div>
+      <div class="plan">
+        <div class="pname">Enterprise</div>
+        <div class="pdesc">For regulated, high-stakes deployments.</div>
+        <div class="price"><span class="amt">Custom</span><span class="per"></span></div>
+        <div class="pmonth">volume &amp; retention based</div>
+        <ul>
+          <li><span class="tick">✓</span>Everything in Scale</li>
+          <li><span class="tick">✓</span>Unlimited agents &amp; tenants</li>
+          <li><span class="tick">✓</span>Dedicated VPC / private link</li>
+          <li><span class="tick">✓</span>SOC 2 / ISO audit packages</li>
+          <li><span class="tick">✓</span>Custom retention &amp; export</li>
+          <li><span class="tick">✓</span>Dedicated solutions engineer</li>
+        </ul>
+        <a href="#signup" class="btn btn-ghost">Contact sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section id="customers">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow" style="justify-content:center">Loved by platform teams</span>
+      <h2>Agents, held to account</h2>
+    </div>
+    <div class="quotes">
+      <div class="quote">
+        <div class="stars">★★★★★</div>
+        <p>We rolled Ledgato out to our researcher agents in an afternoon. A probe found a live-map drift we didn't even know was possible — and it blocked the release until every gate was re-signed with evidence.</p>
+        <div class="who"><span class="ava" style="background:#38f0d0">M</span><div><b>Maya Okafor</b><span>Head of AI Platform · Meridian</span></div></div>
+      </div>
+      <div class="quote">
+        <div class="stars">★★★★★</div>
+        <p>The attestation ledger is the differentiator. Ledgato gates our releases continuously — it blocked an injection escape before our quarterly review even started, with signed proof.</p>
+        <div class="who"><span class="ava" style="background:#8b8bff">J</span><div><b>James Feld</b><span>Staff Engineer · Northwind</span></div></div>
+      </div>
+      <div class="quote">
+        <div class="stars">★★★★★</div>
+        <p>Auditors loved the append-only evidence ledger. SOC 2 evidence that's already current — no crunching, no surprises.</p>
+        <div class="who"><span class="ava" style="background:#ffc44d">S</span><div><b>Sara Lindqvist</b><span>Security Lead · Halcyon</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow" style="justify-content:center">FAQ</span>
+      <h2>Questions, answered</h2>
+    </div>
+    <div class="faq">
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">How is Ledgato different from a one-time security audit?<span class="chev">▾</span></div>
+        <div class="faq-a"><p>An audit is a point-in-time snapshot. Ledgato maps what your agents can access, probes those boundaries, and gates every release with signed, tamper-evident evidence — continuously, not after the fact.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Do I have to change my agents' code?<span class="chev">▾</span></div>
+        <div class="faq-a"><p>No. Ledgato runs as a proxy layer or via a lightweight SDK shim. Your agents keep operating normally — the gate sits between them and the tools they call.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What counts as an "action" you verify?<span class="chev">▾</span></div>
+        <div class="faq-a"><p>Any tool call, API request, file/data write, credential use, or external destination an agent attempts. Each is checked against its declared scope and impact level.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What happens when an action is out of scope?<span class="chev">▾</span></div>
+        <div class="faq-a"><p>It's denied in real time. Depending on policy, you get an automated alert, a human-review queue, a rollback hook, or all three — with the evidence recorded to the ledger.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Is the evidence tamper-proof?<span class="chev">▾</span></div>
+        <div class="faq-a"><p>Yes. Evidence is written to an append-only, hash-chained ledger. Any alteration breaks the chain and is immediately detectable — designed for SOC 2, ISO 27001, and internal trust.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Can it run inside my own VPC?<span class="chev">▾</span></div>
+        <div class="faq-a"><p>Yes. Ledgato deploys in your infrastructure (VPC / on-prem) so your scopes and data never leave your boundary. We offer dedicated and private-link options.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section id="signup">
+  <div class="wrap">
+    <div class="cta-band reveal">
+      <span class="eyebrow" style="justify-content:center;color:var(--cyan2)">Get started</span>
+      <h2>An unverified agent doesn't ship.<br>Ledgato gates every release.</h2>
+      <p class="sub" style="margin:14px auto 0">Map, probe, and gate — with signed evidence on every attestation. Free for up to 3 agents.</p>
+      <div class="cta-btns">
+        <a href="#signup" class="btn btn-primary">Gate a release</a>
+        <a href="#security" class="btn btn-ghost btn-mono">See signed evidence</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer id="docs">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="#top"><span class="logo"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 4-3 7-8 8-5-1-8-4-8-8V7z"/><path d="M12 8v5"/></svg></span> Ledgato</a>
+        <p>Maps what your AI agents can actually access, probes those boundaries, and gates every release with signed, tamper-evident evidence for each check.</p>
+      </div>
+      <div class="foot-col">
+        <h5>Product</h5>
+        <a href="#features">Features</a><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#security">Security</a>
+      </div>
+      <div class="foot-col">
+        <h5>Resources</h5>
+        <a href="#docs">Documentation</a><a href="#faq">FAQ</a><a href="#customers">Customers</a><a href="#top">Changelog</a>
+      </div>
+      <div class="foot-col">
+        <h5>Company</h5>
+        <a href="#docs">About</a><a href="#docs">Careers</a><a href="#docs">Contact</a><a href="#docs">Legal</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2025 Ledgato, Inc. All rights reserved.</span>
+      <span class="mono">built by the agent-security team · SOC2 · 100% evidence-backed</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // mobile menu
+  function toggleMenu(){
+    const links = document.querySelector('.nav-links');
+    links.style.display = links.style.display === 'flex' ? 'none' : 'flex';
+  }
+  // faq accordion
+  function toggleFaq(el){
+    const item = el.parentElement;
+    const body = item.querySelector('.faq-a');
+    const open = item.classList.toggle('open');
+    body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
+  }
+  // pricing toggle
+  let annual = false;
+  function toggleBilling(){
+    const sw = document.getElementById('priceSwitch');
+    annual = !annual;
+    sw.classList.toggle('on', annual);
+    document.querySelectorAll('[data-monthly]').forEach(el=>{
+      el.textContent = annual ? '$' + el.dataset.annual : '$' + el.dataset.monthly;
+    });
+    const lab = document.querySelector('[data-monthly-label]');
+    if(lab) lab.textContent = annual ? lab.dataset.annualLabel : lab.dataset.monthlyLabel;
+  }
+  // reveal on scroll
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  },{threshold:.12});
+  document.querySelectorAll('.reveal, section, .feat, .step, .plan, .quote, .faq-item, .comp-item, .verify-strip').forEach(el=>io.observe(el));
+  // sticky nav shadow
+  window.addEventListener('scroll',()=>{
+    document.querySelector('nav').style.borderColor = window.scrollY>10 ? 'rgba(255,255,255,.16)' : '';
+  });
+</script>
+</body>
+</html>
