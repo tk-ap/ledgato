@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledgato — Agent release assurance</title>
+<meta name="description" content="Ledgato verifies every agent release against a declared capability boundary. If tools, identities, destinations, or data access drift, the release fails until it is re-tested and approved — with signed, tamper-evident attestations.">
+<link rel="canonical" href="https://tk-ap.github.io/ledgato/">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11.5' fill='none' stroke='%236d28d9' stroke-width='4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@700&display=swap">
+<style>
+  :root{
+    /* dark theme (default) */
+    --bg:#0a0a0b;
+    --bg-soft:#0f0f12;
+    --bg-2:#0e0e11;
+    --ink:#ededf0;
+    --ink-2:#c7c7cf;
+    --muted:#9a9aa3;
+    --muted-2:#6f6f78;
+    --hair:#242428;
+    --hair-strong:#333338;
+    --accent:#6d28d9;
+    --accent-ink:#8b5cf6;
+    --accent-soft:#1a1330;
+    --danger:#ff8f8a;
+    --warn:#f0b84c;
+    --nav-bg:rgba(10,10,11,.88);
+    --btn-primary-bg:#e9e9ee;
+    --btn-primary-ink:#0a0a0b;
+    --btn-primary-bg-hover:#ffffff;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --maxw:1080px;
+  }
+  :root[data-theme="light"]{
+    --bg:#ffffff;
+    --bg-soft:#f6f6f7;
+    --bg-2:#fbfafc;
+    --ink:#0a0a0b;
+    --ink-2:#2b2b30;
+    --muted:#66666e;
+    --muted-2:#8a8a93;
+    --hair:#e5e5e9;
+    --hair-strong:#d4d4d9;
+    --accent:#6d28d9;
+    --accent-ink:#5b21b6;
+    --accent-soft:#ede9fe;
+    --danger:#c03434;
+    --warn:#b45309;
+    --nav-bg:rgba(255,255,255,.88);
+    --btn-primary-bg:#0a0a0b;
+    --btn-primary-ink:#ffffff;
+    --btn-primary-bg-hover:#000000;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:var(--accent-soft);color:var(--accent-ink)}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted-2)}
+  .eyebrow b{color:var(--accent);font-weight:600}
+  h1{font-size:clamp(2.3rem,5vw,3.5rem);font-weight:650;letter-spacing:-.03em;line-height:1.06;margin:18px 0}
+  h2{font-size:clamp(1.5rem,3vw,2.1rem);font-weight:600;letter-spacing:-.02em;line-height:1.18;margin-bottom:14px}
+  .lede{font-size:clamp(1.02rem,1.5vw,1.16rem);color:var(--ink-2);max-width:620px}
+
+  .btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14.5px;padding:11px 18px;border-radius:8px;border:1px solid var(--hair-strong);cursor:pointer;transition:.15s;white-space:nowrap;background:var(--bg)}
+  .btn-ink{background:var(--btn-primary-bg);color:var(--btn-primary-ink);border-color:var(--btn-primary-bg)}
+  .btn-ink:hover{background:var(--btn-primary-bg-hover);border-color:var(--btn-primary-bg-hover)}
+  .btn-mono{font-family:var(--mono);font-size:13px}
+  .btn:hover{border-color:var(--ink)}
+  .theme-btn{font-family:var(--mono);font-size:12px;padding:8px 12px;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--hair-strong);border-radius:8px;background:var(--bg);color:var(--ink-2);cursor:pointer;transition:.15s}
+  .theme-btn:hover{border-color:var(--ink)}
+  .theme-btn .ic{color:var(--accent)}
+
+  /* top bar */
+  nav{border-bottom:1px solid var(--hair);position:sticky;top:0;background:var(--nav-bg);backdrop-filter:blur(8px);z-index:50}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{font-weight:700;letter-spacing:-.01em;font-size:17px;display:flex;align-items:center;gap:11px}
+  .wm{font-family:'Space Grotesk','Inter',-apple-system,sans-serif;font-weight:700;letter-spacing:.02em;font-size:19px;line-height:1;display:inline-flex;align-items:center}
+  .wm .o{display:inline-block;width:.8em;height:.8em;margin-left:.09em;color:var(--accent);align-self:center;vertical-align:middle}
+  .wm .o svg{width:100%;height:100%;display:block}
+  .brand-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.06em;text-transform:uppercase;margin-top:4px}
+  .nav-links{display:flex;gap:26px;align-items:center}
+  .nav-links a{color:var(--muted);font-size:14px;font-weight:500}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-cta{display:flex;gap:10px;align-items:center}
+  .nav-cta .btn{font-size:13px;padding:8px 14px}
+
+  section{padding:92px 0}
+  .head{margin-bottom:44px;max-width:720px}
+
+  /* hero */
+  .hero{padding:76px 0 72px;border-bottom:1px solid var(--hair)}
+  .hero-grid{display:grid;grid-template-columns:1.02fr .98fr;gap:60px;align-items:center}
+  .hero h1{font-weight:650}
+  .hero .lede{margin-bottom:30px}
+  .hero-btns{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-foot{margin-top:26px;font-family:var(--mono);font-size:12px;color:var(--muted-2)}
+  .hero-foot b{color:var(--accent);font-weight:600}
+
+  /* terminal */
+  .t-top{display:flex;align-items:center;gap:6px;padding:12px 14px;border:1px solid var(--hair);border-bottom:none;border-radius:10px 10px 0 0;background:var(--bg-2)}
+  .t-dot{width:10px;height:10px;border-radius:50%}
+  .t-title{flex:1;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted-2)}
+  pre.code{background:#0d0d10;color:#e6e6e9;border-radius:0 0 10px 10px;border:1px solid #000;border-top:1px solid #26262b;padding:20px 22px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.8;box-shadow:0 30px 60px -40px rgba(0,0,0,.4)}
+  .code .c{color:#6b6b74}.code .n{color:#ffd28f}.code .ok{color:#4ade80}.code .bad{color:#ff8f8a}
+
+  /* section grid */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+
+  /* check list */
+  .check{border-top:1px solid var(--hair)}
+  .check .row{display:flex;justify-content:space-between;gap:20px;padding:16px 2px;border-bottom:1px solid var(--hair);font-size:15px;align-items:baseline}
+  .check .row b{font-weight:500}
+  .check .row span{color:var(--muted-2);font-family:var(--mono);font-size:12px;white-space:nowrap}
+
+  /* steps */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:s}
+  .step{border-top:1px solid var(--hair-strong);padding-top:18px}
+  .step::before{counter-increment:s;content:"0" counter(s);font-family:var(--mono);color:var(--muted-2);font-size:13px}
+  .step h3{font-size:16px;font-weight:600;margin:12px 0 6px}
+  .step p{font-size:14px;color:var(--muted)}
+
+  /* gate decision */
+  .verdicts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:30px}
+  .verdict{border:1px solid var(--hair);border-radius:10px;padding:18px}
+  .verdict b{display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:600;margin-bottom:6px}
+  .verdict p{font-size:13.5px;color:var(--muted)}
+  .v-pass .dotv{color:var(--accent)}.v-fail .dotv{color:var(--danger)}.v-rev .dotv{color:var(--warn)}
+  .dotv{font-family:var(--mono);font-weight:600}
+
+  /* evidence */
+  .checks{list-style:none}
+  .checks li{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--hair);align-items:flex-start}
+  .checks li:last-child{border-bottom:none}
+  .checks .k{flex:none;width:18px;height:18px;margin-top:3px;border-radius:50%;border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:11px;font-weight:700}
+  .checks b{font-weight:600;font-size:15px;display:block}
+  .checks span{font-size:14px;color:var(--muted)}
+
+  .code-label{font-family:var(--mono);font-size:11.5px;color:var(--muted-2);margin-bottom:10px;letter-spacing:.02em}
+
+  /* deploy */
+  .deploy{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .dep{border:1px solid var(--hair);border-radius:10px;padding:20px}
+  .dep .m{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.02em;text-transform:uppercase;margin-bottom:10px}
+  .dep h3{font-size:15px;font-weight:600;margin-bottom:6px}
+  .dep p{font-size:13.5px;color:var(--muted)}
+
+  /* faq */
+  .faq{max-width:760px;margin:0 auto}
+  .faq-item{border-bottom:1px solid var(--hair)}
+  .faq-q{display:flex;justify-content:space-between;align-items:center;padding:20px 2px;cursor:pointer;font-weight:500;font-size:15.5px}
+  .faq-q .ch{transition:.2s;color:var(--muted-2);font-family:var(--mono)}
+  .faq-item.open .ch{transform:rotate(45deg);color:var(--ink)}
+  .faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .faq-a p{padding:0 2px 22px;color:var(--muted);font-size:14.5px;max-width:640px}
+
+  /* cta */
+  .cta{border-top:1px solid var(--hair);background:var(--bg-soft);text-align:center;padding:100px 0}
+  .cta h2{font-size:clamp(1.8rem,3.4vw,2.6rem)}
+  .cta .lede{margin:0 auto 32px}
+  .cta .btn{font-size:15px}
+
+  footer{border-top:1px solid var(--hair);padding:52px 0 40px}
+  .foot{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:40px}
+  .foot .brand{margin-bottom:12px}
+  .foot p{font-size:13px;color:var(--muted);max-width:300px}
+  .foot h5{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);margin-bottom:14px}
+  .foot a{display:block;color:var(--muted);font-size:13.5px;padding:5px 0}
+  .foot a:hover{color:var(--ink)}
+  .foot-bottom{border-top:1px solid var(--hair);margin-top:40px;padding-top:22px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;color:var(--muted-2);font-size:12.5px}
+  .foot-bottom .m{font-family:var(--mono)}
+
+  @media(max-width:920px){
+    .hero-grid,.split{grid-template-columns:1fr;gap:40px}
+    .steps,.verdicts,.deploy{grid-template-columns:1fr}
+    .foot{grid-template-columns:1fr 1fr}
+    .nav-links{display:none}
+  }
+  @media(max-width:560px){ .foot{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="wrap">
+    <div class="nav">
+      <a class="brand" href="#top"><span class="wm">LEDGAT<span class="o"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></span></a>
+      <div class="nav-links">
+        <a href="#verify">What it verifies</a>
+        <a href="#how">How it works</a>
+        <a href="#gate">The release gate</a>
+        <a href="#evidence">Evidence</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="nav-cta">
+        <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" aria-label="Toggle color theme"><span class="ic" id="theme-ic">☀</span><span id="theme-label">Light</span></button>
+        <a href="#cta" class="btn btn-mono">Join the private beta</a>
+        <a href="#cta" class="btn btn-ink btn-mono">Request a design-partner assessment</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow"><b>// agent release assurance</b></div>
+        <h1>An unverified agent<br>doesn't ship.</h1>
+        <p class="lede">Before you promote an agent to production, Ledgato verifies its actual permissions against the permissions you approved. If tools, identities, destinations, or data access drift, the release fails until it is re-tested and approved.</p>
+        <div class="hero-btns">
+          <a href="#cta" class="btn btn-ink">Request a design-partner assessment</a>
+          <a href="#cta" class="btn btn-mono">Join the private beta</a>
+        </div>
+        <div class="hero-foot">declared boundary · verified at release · <b>signed attestation</b> for every gate</div>
+      </div>
+      <div>
+        <div class="t-top">
+          <span class="t-dot" style="background:#d8d8dd"></span>
+          <span class="t-dot" style="background:#e5e5e9"></span>
+          <span class="t-dot" style="background:#e5e5e9"></span>
+          <span class="t-title">ledgato verify</span>
+        </div>
+        <pre class="code"><span class="c">$</span> ledgato verify --agent researcher --release v2.4
+<span class="c"># comparing release v2.4 against approved boundary …</span>
+
+<span class="n">tools</span>         <span class="ok">read.docs · search · github.read    PASS</span>
+<span class="n">identities</span>    <span class="ok">service-account:research            PASS</span>
+<span class="n">destinations</span>   <span class="ok">allow-list                           PASS</span>
+<span class="n">data access</span>   <span class="ok">sandbox::*                           PASS</span>
+
+<span class="n">✗ db.write</span>      <span class="bad">drifted — not in the approved boundary</span>
+<span class="bad">RELEASE BLOCKED</span> <span class="c">until re-tested and approved</span>
+
+<span class="c"># attestation <span class="ok">#9f31…c2</span> sealed → ledger</span></pre>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- WHAT IT VERIFIES -->
+<section id="verify">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow"><b>// release verification</b></div>
+      <h2>What Ledgato verifies before an agent ships</h2>
+      <p class="lede">Each release is checked against the capability boundary you declared and approved. Anything that drifts fails the gate.</p>
+    </div>
+    <div class="check">
+      <div class="row"><b>Allowed tools &amp; MCP servers</b><span>policy.mcp</span></div>
+      <div class="row"><b>External data sources &amp; destinations</b><span>policy.egress</span></div>
+      <div class="row"><b>Cloud roles &amp; service identities</b><span>policy.iam</span></div>
+      <div class="row"><b>Secret mounts &amp; environment</b><span>policy.secrets</span></div>
+      <div class="row"><b>Required human approvals</b><span>policy.gate</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow"><b>// how it works</b></div>
+      <h2>Three steps to a verified release</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h3>Declare the boundary</h3>
+        <p>Each agent ships with a capability boundary — allowed tools, destinations, data domains, and roles — that you review and approve as code.</p>
+      </div>
+      <div class="step">
+        <h3>Verify at release</h3>
+        <p>Before deployment, Ledgato checks the agent's actual permissions and configuration against the boundary you approved.</p>
+      </div>
+      <div class="step">
+        <h3>Drift fails the release</h3>
+        <p>If tools, identities, destinations, or data access drift, the release is blocked until it is re-tested and approved.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- THE RELEASE GATE -->
+<section id="gate">
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow"><b>// the release gate</b></div>
+      <h2>Policy as code, not a checklist</h2>
+      <p class="lede">A boundary is declared in a versioned policy file, reviewed, and enforced by a CI gate. Every check produces a decision and a signed record.</p>
+      <div class="verdicts">
+        <div class="verdict v-pass"><b><span class="dotv">●</span> Pass</b><p>Every check is within the approved boundary.</p></div>
+        <div class="verdict v-fail"><b><span class="dotv">●</span> Fail</b><p>A permission has drifted outside the boundary.</p></div>
+        <div class="verdict v-rev"><b><span class="dotv">●</span> Review</b><p>High-impact change routed for human approval.</p></div>
+      </div>
+    </div>
+    <div>
+      <div class="code-label">fence.yaml</div>
+      <pre class="code"><span class="c"># fence.yaml · agent "researcher"</span>
+capability:
+  tools:
+    allow: [read.docs, search, github.read]
+    deny:  [db.write]
+  data:     [sandbox::*]
+  roles:    [service-account:research]
+  approvals:
+    write: human_required
+  egress:
+    allow: [outbound-allow-list]</pre>
+    </div>
+  </div>
+</section>
+
+<!-- EVIDENCE -->
+<section id="evidence">
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow"><b>// evidence</b></div>
+      <h2>A signed record for every release</h2>
+      <p class="lede">Each gate emits a signed, tamper-evident attestation — ready to hand to an auditor.</p>
+      <ul class="checks">
+        <li><span class="k">✓</span><div><b>Policy version &amp; hash</b><span>Which boundary this release was verified against.</span></div></li>
+        <li><span class="k">✓</span><div><b>Discovered facts</b><span>What tools, roles, and destinations were actually found.</span></div></li>
+        <li><span class="k">✓</span><div><b>Rule results</b><span>Every check and its pass / fail / review outcome.</span></div></li>
+        <li><span class="k">✓</span><div><b>Decision &amp; sign-off</b><span>Release verdict, timestamp, and signer identity.</span></div></li>
+      </ul>
+    </div>
+    <div>
+      <div class="code-label">attestation.json</div>
+      <pre class="code"><span class="c">{
+  "release": "v2.4",
+  "policy": { "sha256": "4c1f…a9", "version": 12 },
+  "facts": { "tools": 3, "roles": 1, "dest": 4 },
+  "checks": [
+    { "id": "egress",      "result": "pass" },
+    { "id": "db.write",    "result": "fail" }
+  ],
+  "decision": "blocked",
+  "signer": "ledgato-ci",
+  "sig": "Ed25519 …"
+}</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- DEPLOYMENT -->
+<section id="deploy">
+  <div class="wrap">
+    <div class="head">
+      <div class="eyebrow"><b>// deployment</b></div>
+      <h2>Runs where your releases are decided</h2>
+    </div>
+    <div class="deploy">
+      <div class="dep"><div class="m">CI</div><h3>GitHub Action</h3><p>A `ledgato verify` step on every agent release. Block the deploy on drift.</p></div>
+      <div class="dep"><div class="m">CLI</div><h3>Local &amp; scripts</h3><p>Verify from the terminal in seconds. Fails loudly with a clear report.</p></div>
+      <div class="dep"><div class="m">VPC</div><h3>Your environment</h3><p>Deploy in your infrastructure and retain control of operational data.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <div class="wrap">
+    <div class="head" style="margin:0 auto 30px;text-align:center;max-width:600px">
+      <div class="eyebrow"><b>// faq</b></div>
+      <h2>Questions, answered</h2>
+    </div>
+    <div class="faq">
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What does Ledgato actually do at launch?<span class="ch">+</span></div>
+        <div class="faq-a"><p>Ledgato is an agent release gate. It verifies each release against the capability boundary you approved — tools, destinations, data domains, and roles — and blocks it if anything has drifted, with a signed, downloadable attestation for every check.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">How is that different from a one-time audit?<span class="ch">+</span></div>
+        <div class="faq-a"><p>An audit is a point-in-time snapshot. Ledgato re-verifies the boundary on every release, so your evidence always matches the deployment you actually shipped — not a report from months ago.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What does a release verification cover?<span class="ch">+</span></div>
+        <div class="faq-a"><p>Agent configuration and deployment manifests: allowed tools and MCP servers, external data sources, cloud roles, secret mounts, and network egress — each checked against the declared boundary.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">What happens when a release drifts?<span class="ch">+</span></div>
+        <div class="faq-a"><p>If tools, identities, destinations, or data access drift from the approved boundary, the release is blocked until it is re-tested and approved. The findings are recorded to the ledger.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Is the evidence tamper-proof?<span class="ch">+</span></div>
+        <div class="faq-a"><p>Evidence is written to an append-only, hash-chained, signing ledger — any alteration breaks the chain and is detectable. We design toward per-tenant signing keys, WORM storage, and external timestamping for audit and investigation.</p></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">Is runtime enforcement available?<span class="ch">+</span></div>
+        <div class="faq-a"><p>Runtime action-level enforcement is on the roadmap as an enterprise extension. At launch, Ledgato focuses on what matters most: verifying each agent release against the boundary you approved.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="cta">
+  <div class="wrap">
+    <div class="eyebrow" style="color:var(--accent)"><b>// get started</b></div>
+    <h2>An unverified agent doesn't ship.</h2>
+    <p class="lede">We're onboarding a small number of design partners for the release gate. The private beta is open now.</p>
+    <div class="hero-btns" style="justify-content:center">
+      <a href="#cta" class="btn btn-ink">Request a design-partner assessment</a>
+      <a href="#cta" class="btn btn-mono">Join the private beta</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <div>
+        <a class="brand" href="#top"><span class="wm">LEDGAT<span class="o"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/></svg></span></span></a>
+        <div class="brand-tag">verify before you ship</div>
+        </div>
+        <p>Verifies every agent release against the capability boundary you approved — and blocks it until it's re-tested, with signed, tamper-evident attestations.</p>
+      </div>
+      <div>
+        <h5>Product</h5>
+        <a href="#verify">What it verifies</a>
+        <a href="#how">How it works</a>
+        <a href="#gate">Release gate</a>
+        <a href="#evidence">Evidence</a>
+      </div>
+      <div>
+        <h5>Resources</h5>
+        <a href="#deploy">Deployment</a>
+        <a href="#faq">FAQ</a>
+        <a href="#cta">Private beta</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Ledgato, Inc.</span>
+      <span class="m">agent release assurance · design-partner program open</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // theme: dark is default; light is opt-in via toggle
+  (function(){
+    var saved = null;
+    try { saved = localStorage.getItem('ledgato-theme'); } catch(e){}
+    if (saved === 'light' || saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', saved);
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+
+  function toggleTheme(){
+    var root = document.documentElement;
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('ledgato-theme', next); } catch(e){}
+    updateThemeBtn();
+  }
+  function updateThemeBtn(){
+    var dark = document.documentElement.getAttribute('data-theme') !== 'light';
+    document.getElementById('theme-ic').textContent = dark ? '☀' : '☾';
+    document.getElementById('theme-label').textContent = dark ? 'Light' : 'Dark';
+  }
+  updateThemeBtn();
+
+  function toggleFaq(el){
+    const item = el.parentElement;
+    const body = item.querySelector('.faq-a');
+    const open = item.classList.toggle('open');
+    body.style.maxHeight = open ? body.scrollHeight + 'px' : '0';
+  }
+</script>
+</body>
+</html>
