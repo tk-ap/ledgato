@@ -1,0 +1,20 @@
+version: 0.1.0
+product: ledgato
+inbound:
+  - from: agent-os
+    contract: contracts/capability-manifest.schema.json
+    purpose: map-requested-capability
+  - from: agent-os
+    contract: contracts/authority-request.schema.json
+    purpose: resolve-effective-authority
+outbound:
+  - to: agent-os
+    contract: authority-decision
+    trigger: policy-evaluation-complete
+  - to: ailhat
+    contract: authority-status
+    trigger: initiative-readiness-changed
+cross_market:
+  - trigger: unmanaged-agent-or-workflow-detected
+    destination: agent-os
+    message: Organize this agent and its skills as a governed workforce.
