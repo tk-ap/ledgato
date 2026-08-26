@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <meta name="description" content="Ledgato containment preview: policy decision, adversarial probes, release gate, and signed evidence." />
+    <title>Ledgato — Containment preview</title>
+    <link rel="stylesheet" href="/app/style.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/">LEDGAT<span>O</span></a>
+      <div class="mode"><i></i> PREVIEW / EPHEMERAL</div>
+    </header>
+    <main>
+      <section class="intro">
+        <p class="eyebrow">MINIMAL LIVE PRODUCT SLICE</p>
+        <h1>Prove the boundary<br />before the agent acts.</h1>
+        <p class="lede">This preview calls the real Ledgato engine. It evaluates policy, attacks the boundary, gates the release, signs the evidence, and verifies the ledger. It never executes the external tool.</p>
+      </section>
+
+      <section class="grid">
+        <form id="run-form" class="panel">
+          <div class="panel-head"><span>01</span><h2>Attempt</h2></div>
+          <label>Agent<input name="agent" value="ops-agent" readonly /></label>
+          <label>Release<input name="release" value="preview-1" required /></label>
+          <label>Tool
+            <select name="tool">
+              <option value="db.write">db.write — denied</option>
+              <option value="read.docs">read.docs — allowed</option>
+            </select>
+          </label>
+          <label>Data domain<input name="domain" value="prod::billing" required /></label>
+          <label>Impact
+            <select name="impact"><option>write</option><option>readonly</option><option>destructive</option></select>
+          </label>
+          <button type="submit">Run containment check <span>→</span></button>
+          <p class="note">Authorization only. No external action is executed.</p>
+        </form>
+
+        <section class="panel result" aria-live="polite">
+          <div class="panel-head"><span>02</span><h2>Verified evidence</h2></div>
+          <div id="empty" class="empty">Run the containment check to generate signed evidence.</div>
+          <div id="output" hidden>
+            <div class="verdict"><span id="verdict-dot"></span><strong id="verdict"></strong><small id="reason"></small></div>
+            <dl>
+              <div><dt>Adversarial probes</dt><dd id="probes"></dd></div>
+              <div><dt>Release gate</dt><dd id="gate"></dd></div>
+              <div><dt>Ledger chain</dt><dd id="ledger"></dd></div>
+              <div><dt>Evidence ID</dt><dd id="evidence-id"></dd></div>
+              <div><dt>Signed hash</dt><dd id="hash"></dd></div>
+            </dl>
+            <details><summary>Inspect response</summary><pre id="raw"></pre></details>
+          </div>
+          <div id="error" class="error" hidden></div>
+        </section>
+      </section>
+    </main>
+    <footer>Live engine · preview data only · durable storage not connected</footer>
+    <script type="module" src="/app/main.js"></script>
+  </body>
+</html>

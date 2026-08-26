@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.venv/
+.vercel/
+*.pyc
+__pycache__/
+keys/
+ledger.jsonl
+.vercel
+.env*

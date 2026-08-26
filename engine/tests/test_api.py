@@ -116,3 +116,27 @@ def test_health_reports_difficulty(client):
     r = client.get("/health").json()
     assert "difficulty" in r
     assert r["version"] == "0.2.0"
+
+
+def test_demo_run_blocks_attempt_and_returns_verified_evidence(client):
+    r = client.post(
+        "/v1/demo/run",
+        json={
+            "agent": "ops-agent",
+            "release": "preview-42",
+            "attempt": {
+                "tool": "db.write",
+                "domain": "prod::billing",
+                "impact": "write",
+            },
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["mode"] == "preview_ephemeral"
+    assert body["executed_external_action"] is False
+    assert body["decision"]["allow"] is False
+    assert body["gate"]["verdict"] == "GATED"
+    assert body["probes"]["passed"] == body["probes"]["total"]
+    assert body["ledger"]["verified"] is True
+    assert body["decision_evidence"]["signature"]

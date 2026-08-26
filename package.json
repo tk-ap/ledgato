@@ -1,0 +1,16 @@
+{
+  "name": "ledgato-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "test": "npm run test:web && npm run test:engine",
+    "test:web": "node --test tests/*.test.js",
+    "test:engine": "python -m pytest engine/tests"
+  },
+  "devDependencies": {
+    "vite": "7.3.6"
+  }
+}

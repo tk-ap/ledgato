@@ -1,0 +1,14 @@
+policies:
+  - agent: ops-agent
+    allow_tool:
+      - read.docs
+      - search
+    deny_tool:
+      - db.write
+      - exec.shell
+    impact_max: readonly
+    data_domains:
+      - sandbox::*
+    on_deny:
+      - block
+      - alert
