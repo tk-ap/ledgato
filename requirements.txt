@@ -1,1 +1,4 @@
--e ./engine
+PyYAML>=6.0
+cryptography>=41.0
+fastapi>=0.110
+uvicorn>=0.27
