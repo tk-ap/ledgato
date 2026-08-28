@@ -6,10 +6,15 @@ test("the public landing page links to the containment slice", async () => {
   const source = await readFile(new URL("../index.html", import.meta.url), "utf8");
   assert.match(source, /href="\/app"/);
   assert.match(source, /ephemeral preview evidence/);
+  assert.match(source, /LEDGAT<span>o<\/span>/);
+  assert.doesNotMatch(source, /LEDGAT<span>O<\/span>/);
 });
 
 test("the app route calls the atomic preview API", async () => {
+  const document = await readFile(new URL("../app/index.html", import.meta.url), "utf8");
   const source = await readFile(new URL("../app/main.js", import.meta.url), "utf8");
+  assert.match(document, /LEDGAT<span>o<\/span>/);
+  assert.doesNotMatch(document, /LEDGAT<span>O<\/span>/);
   assert.match(source, /\/api\/v1\/demo\/run/);
 });
 
