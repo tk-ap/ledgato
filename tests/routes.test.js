@@ -8,6 +8,7 @@ test("the public landing page links to the containment slice", async () => {
   assert.match(source, /ephemeral preview evidence/);
   assert.match(source, /LEDGAT<span>o<\/span>/);
   assert.doesNotMatch(source, /LEDGAT<span>O<\/span>/);
+  assert.match(source, /\.hero h1\{font-family:var\(--display\)\}/);
 });
 
 test("the app route calls the atomic preview API", async () => {
