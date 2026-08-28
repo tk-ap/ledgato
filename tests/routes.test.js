@@ -16,6 +16,9 @@ test("the app route calls the atomic preview API", async () => {
   const source = await readFile(new URL("../app/main.js", import.meta.url), "utf8");
   assert.match(document, /LEDGAT<span>o<\/span>/);
   assert.doesNotMatch(document, /LEDGAT<span>O<\/span>/);
+  assert.match(document, /family=Inter/);
+  assert.match(document, /family=JetBrains\+Mono/);
+  assert.match(document, /family=Space\+Grotesk/);
   assert.match(source, /\/api\/v1\/demo\/run/);
 });
 
