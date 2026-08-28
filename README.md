@@ -1,8 +1,8 @@
 # Ledgato
 
-**A release gate + signed-evidence layer for agentic AI.**
+**The headless authorization service for Agent OS.**
 
-Ledgato maps what your AI agents can actually access, probes those boundaries with adversarial attacks, and gates every release with signed, tamper-evident attestations. If an agent isn't verified — or has drifted from its declared scope — Ledgato blocks it before it reaches production.
+Ledgato accepts capability manifests and authority requests from Agent OS, resolves what an agent may do, and returns an explicit allow, deny, or approval-required decision with signed evidence before any harness executes the work.
 
 > *An unverified agent doesn't ship.*
 
@@ -26,6 +26,24 @@ The real product lives in [`engine/`](./engine/) — a Python package (FastAPI b
 - **Distributed ledger** — independent nodes reconcile via longest-valid-chain consensus, so no single node can silently rewrite the evidence.
 - **Attestation verification & ops** — verify a release in the live chain, or export a self-contained verifiable report an auditor can check offline.
 
+### Agent OS contract
+
+`POST /v1/authority/resolve` is the primary headless integration. It accepts:
+
+- an `authority_request` describing the requesting agent, intended actions, resources, and constraints;
+- a `capability_manifest` describing the workforce and tools Agent OS proposes to use.
+
+Ledgato verifies that both contracts describe the same work, checks the requested authority against `fence.yaml`, and returns an `authority-decision` containing:
+
+- `allow`, `deny`, or `approval_required`;
+- human-readable reasons;
+- the number of action/resource paths evaluated;
+- a signed, hash-chained ledger reference.
+
+Canonical JSON Schemas live in [`contracts/`](./contracts/).
+
+`GET /v1/authority/status/{work_id}` exposes only the resulting authorization state—`authorized`, `blocked`, or `awaiting_approval`—for AILHAT outcome and readiness tracking. It does not expose or accept portfolio priority.
+
 ### Quick start
 
 ```bash
@@ -45,7 +63,7 @@ ledgato sync --remote http://peer:8000                        # distributed cons
 ledgato api --port 8000
 ```
 
-`/health` · `/v1/actions/check` · `/v1/probes/run` · `/v1/releases/attest` ·
+`/health` · `/v1/authority/resolve` · `/v1/actions/check` · `/v1/probes/run` · `/v1/releases/attest` ·
 `/v1/ledger` (+ `status`, `chain`, `reconcile`) ·
 `/v1/attestations/verify` · `/v1/attestations/report`
 
@@ -57,4 +75,4 @@ Ledgato runs as a proxy layer or via a lightweight SDK shim — your agents keep
 
 ---
 
-This repository hosts the public landing page for Ledgato (`index.html`) and the working engine (`/engine/`).
+The working product is the headless service in `/engine/`. The public page is explanatory; Agent OS and execution harnesses consume the service through contracts.

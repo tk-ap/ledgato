@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-os.local/contracts/authority-decision.schema.json",
+  "title": "Ledgato Authority Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision_id", "request_id", "work_id", "outcome", "reasons", "policy", "evaluated_actions", "decided_at", "evidence"],
+  "properties": {
+    "decision_id": {"type": "string"},
+    "request_id": {"type": "string"},
+    "work_id": {"type": "string"},
+    "outcome": {"enum": ["allow", "deny", "approval_required"]},
+    "reasons": {"type": "array", "items": {"type": "string"}},
+    "policy": {"type": "string"},
+    "evaluated_actions": {"type": "integer", "minimum": 0},
+    "decided_at": {"type": "string", "format": "date-time"},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ledger_entry_id", "ledger_hash", "signature", "public_key"],
+      "properties": {
+        "ledger_entry_id": {"type": "string"},
+        "ledger_hash": {"type": "string"},
+        "signature": {"type": "string"},
+        "public_key": {"type": "string"}
+      }
+    }
+  }
+}
