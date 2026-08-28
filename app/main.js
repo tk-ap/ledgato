@@ -50,6 +50,8 @@ form.addEventListener("submit", async (event) => {
     document.querySelector("#verdict-dot").className = blocked ? "blocked" : "allowed";
     empty.hidden = true;
     output.hidden = false;
+    output.classList.remove("result-ready");
+    requestAnimationFrame(() => output.classList.add("result-ready"));
   } catch (cause) {
     output.hidden = true;
     empty.hidden = true;

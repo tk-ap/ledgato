@@ -9,6 +9,16 @@ test("the public landing page links to the containment slice", async () => {
   assert.match(source, /LEDGAT<span>o<\/span>/);
   assert.doesNotMatch(source, /LEDGAT<span>O<\/span>/);
   assert.match(source, /\.hero h1\{font-family:var\(--display\)\}/);
+  assert.match(source, /src="\/motion\.js"/);
+});
+
+test("the core UI direction includes accessible scroll motion", async () => {
+  const script = await readFile(new URL("../motion.js", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../motion.css", import.meta.url), "utf8");
+  assert.match(script, /IntersectionObserver/);
+  assert.match(script, /hashchange/);
+  assert.match(script, /prefers-reduced-motion/);
+  assert.match(styles, /prefers-reduced-motion:reduce/);
 });
 
 test("the app route calls the atomic preview API", async () => {
