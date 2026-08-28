@@ -3,6 +3,13 @@ const empty = document.querySelector("#empty");
 const output = document.querySelector("#output");
 const error = document.querySelector("#error");
 const button = form.querySelector("button");
+const guide = document.querySelector("#guide");
+
+document.querySelector("#open-guide").addEventListener("click", () => guide.showModal());
+document.querySelector("#close-guide").addEventListener("click", () => guide.close());
+guide.addEventListener("click", (event) => {
+  if (event.target === guide) guide.close();
+});
 
 const setText = (id, value) => {
   document.querySelector(`#${id}`).textContent = value;
@@ -31,9 +38,12 @@ form.addEventListener("submit", async (event) => {
     const blocked = !body.decision.allow;
     setText("verdict", blocked ? "ACTION BLOCKED" : "ACTION ALLOWED");
     setText("reason", body.decision.reason);
-    setText("probes", `${body.probes.passed}/${body.probes.total} passed`);
-    setText("gate", body.gate.verdict);
-    setText("ledger", body.ledger.verified ? `${body.ledger.entries} entries · verified` : "verification failed");
+    setText("plain-result", blocked
+      ? `Ledgato stopped the agent from using ${values.tool} on ${values.domain}. That action is outside the agent's allowed boundary.`
+      : `Ledgato allowed the agent to use ${values.tool}. The action fits inside the agent's declared boundary.`);
+    setText("probes", `${body.probes.passed} of ${body.probes.total} tests held`);
+    setText("gate", body.gate.verdict === "GATED" ? "Stopped — needs attention" : "Ready");
+    setText("ledger", body.ledger.verified ? "Yes — record verified" : "No — verification failed");
     setText("evidence-id", body.decision_evidence.id);
     setText("hash", body.decision_evidence.hash.slice(0, 24) + "…");
     setText("raw", JSON.stringify(body, null, 2));
@@ -47,6 +57,6 @@ form.addEventListener("submit", async (event) => {
     error.hidden = false;
   } finally {
     button.disabled = false;
-    button.innerHTML = "Run containment check <span>→</span>";
+    button.innerHTML = "See whether Ledgato stops it <span>→</span>";
   }
 });

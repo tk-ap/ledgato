@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/app/style.css" />
     <link rel="stylesheet" href="/app/production.css" />
     <link rel="stylesheet" href="/app/brand.css" />
+    <link rel="stylesheet" href="/app/education.css" />
   </head>
   <body>
     <div class="status-rail"><span>AUTHORIZATION CONTROL PLANE</span><strong>PREVIEW · REAL ENGINE / EPHEMERAL EVIDENCE</strong></div>
@@ -24,46 +25,47 @@
       <section class="intro">
         <p class="eyebrow">VERIFICATION · DECISION INTERPOSED</p>
         <h1>Can it break<br />the boundary?</h1>
-        <p class="lede">This preview calls the real Ledgato engine. It evaluates policy, attacks the boundary, gates the release, signs the evidence, and verifies the ledger. It never executes the external tool.</p>
+        <p class="lede">Choose something an AI agent might try to do. Ledgato will decide whether it should be allowed, test whether the boundary holds, and explain the result. Nothing outside this preview is actually changed.</p>
+        <button class="guide-button" id="open-guide" type="button">What am I looking at? <span>A one-minute guide →</span></button>
       </section>
 
       <section class="grid">
         <form id="run-form" class="panel">
-          <div class="panel-head"><span>01</span><h2>Attempt</h2></div>
-          <label>Agent<input name="agent" value="ops-agent" readonly /></label>
-          <label>Release<input name="release" value="preview-1" required /></label>
-          <label>Tool
+          <div class="panel-head"><span>01</span><h2>What should this agent try to do?</h2></div>
+          <label>Who is trying to act?<small>The AI agent whose permissions we are testing.</small><input name="agent" value="ops-agent" readonly /></label>
+          <label>Which version are we testing?<small>This is only a name for the test result. You can leave it as-is.</small><input name="release" value="preview-1" required /></label>
+          <label>What is the agent trying to use?<small>Choose an action that should either be allowed or stopped.</small>
             <select name="tool">
-              <option value="db.write">db.write — denied</option>
-              <option value="read.docs">read.docs — allowed</option>
+              <option value="db.write">Write to the billing database — should be stopped</option>
+              <option value="read.docs">Read sandbox documents — should be allowed</option>
             </select>
           </label>
-          <label>Data domain<input name="domain" value="prod::billing" required /></label>
-          <label>Impact
-            <select name="impact"><option>write</option><option>readonly</option><option>destructive</option></select>
+          <label>What information is it trying to reach?<small>This example points to real-world billing data, not a sandbox.</small><input name="domain" value="prod::billing" required /></label>
+          <label>How much could the action change?<small>Think of this as the worst thing the action could do.</small>
+            <select name="impact"><option value="write">Make changes</option><option value="readonly">View only</option><option value="destructive">Delete or cause serious damage</option></select>
           </label>
-          <button type="submit">Run containment check <span>→</span></button>
-          <p class="note">Authorization only. No external action is executed.</p>
+          <button type="submit">See whether Ledgato stops it <span>→</span></button>
+          <p class="note">Safe preview: Ledgato makes a decision, but does not perform the action.</p>
         </form>
 
         <section class="panel result" aria-live="polite">
-          <div class="panel-head"><span>02</span><h2>Verified evidence</h2></div>
-          <div id="empty" class="empty">Run the containment check to generate signed evidence.</div>
+          <div class="panel-head"><span>02</span><h2>What happened, and why?</h2></div>
+          <div id="empty" class="empty">Run the check. Ledgato will explain whether the action was allowed or stopped.</div>
           <div id="output" hidden>
             <div class="verdict"><span id="verdict-dot"></span><strong id="verdict"></strong><small id="reason"></small></div>
+            <div class="plain-result" id="plain-result"></div>
             <dl>
-              <div><dt>Adversarial probes</dt><dd id="probes"></dd></div>
-              <div><dt>Release gate</dt><dd id="gate"></dd></div>
-              <div><dt>Ledger chain</dt><dd id="ledger"></dd></div>
-              <div><dt>Evidence ID</dt><dd id="evidence-id"></dd></div>
-              <div><dt>Signed hash</dt><dd id="hash"></dd></div>
+              <div><dt>Did the boundary hold?<small>We tried several ways to get around the rule.</small></dt><dd id="probes"></dd></div>
+              <div><dt>Is this version safe to release?<small>“Stopped” means it needs attention before release.</small></dt><dd id="gate"></dd></div>
+              <div><dt>Can we trust the record?<small>Verified means the evidence has not been changed.</small></dt><dd id="ledger"></dd></div>
             </dl>
-            <details><summary>Inspect response</summary><pre id="raw"></pre></details>
+            <details class="technical"><summary>Show technical proof</summary><div class="proof-row"><span>Evidence ID</span><code id="evidence-id"></code></div><div class="proof-row"><span>Signed hash</span><code id="hash"></code></div><pre id="raw"></pre></details>
           </div>
           <div id="error" class="error" hidden></div>
         </section>
       </section>
     </main>
+    <dialog id="guide"><div class="guide-head"><div><p class="eyebrow">ONE-MINUTE GUIDE</p><h2>Ledgato is a safety check for AI agents.</h2></div><button id="close-guide" type="button" aria-label="Close guide">×</button></div><ol><li><strong>Choose an attempted action.</strong><span>Tell Ledgato who is acting, what they want to use, and what they want to reach.</span></li><li><strong>Ledgato checks the rule.</strong><span>The policy says what the agent may and may not do.</span></li><li><strong>Ledgato tries to break the boundary.</strong><span>It runs several tests to make sure the forbidden action cannot sneak through another way.</span></li><li><strong>You get a plain answer and proof.</strong><span>The action is allowed or stopped, and Ledgato records evidence showing why.</span></li></ol><p class="guide-note">This preview makes real policy decisions, but it does not connect to or change an outside system.</p></dialog>
     <footer>AN UNVERIFIED AGENT DOESN'T SHIP · REAL ENGINE · PREVIEW DATA · DURABLE STORAGE NOT CONNECTED</footer>
     <script type="module" src="/app/main.js"></script>
   </body>

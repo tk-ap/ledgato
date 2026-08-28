@@ -19,6 +19,10 @@ test("the app route calls the atomic preview API", async () => {
   assert.match(document, /family=Inter/);
   assert.match(document, /family=JetBrains\+Mono/);
   assert.match(document, /family=Space\+Grotesk/);
+  assert.match(document, /What am I looking at\?/);
+  assert.match(document, /Who is trying to act\?/);
+  assert.match(document, /What happened, and why\?/);
+  assert.match(document, /Show technical proof/);
   assert.match(source, /\/api\/v1\/demo\/run/);
 });
 
