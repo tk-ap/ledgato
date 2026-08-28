@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-os.local/contracts/authority-status.schema.json",
+  "title": "Ledgato Authority Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["work_id", "state", "decision_id", "updated_at", "evidence_hash"],
+  "properties": {
+    "work_id": {"type": "string"},
+    "state": {"enum": ["authorized", "blocked", "awaiting_approval"]},
+    "decision_id": {"type": "string"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "evidence_hash": {"type": "string"}
+  }
+}

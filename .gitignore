@@ -1,0 +1,10 @@
+.env
+.env.*
+.venv/
+.vercel/
+dist/
+keys/
+ledger.jsonl
+node_modules/
+__pycache__/
+.pytest_cache/
