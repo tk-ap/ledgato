@@ -95,6 +95,24 @@ The working engine lives in [`engine/`](./engine/) — a Python package (FastAPI
 - **Distributed ledger** — independent nodes can reconcile evidence via longest-valid-chain consensus.
 - **Attestation verification & ops** — verify decisions in the live chain, or export a self-contained verifiable report an auditor can check offline.
 
+### Agent OS contract
+
+`POST /v1/authority/resolve` is the primary headless integration. It accepts:
+
+- an `authority_request` describing the requesting agent, intended actions, resources, and constraints;
+- a `capability_manifest` describing the workforce and tools Agent OS proposes to use.
+
+Ledgato verifies that both contracts describe the same work, checks the requested authority against `fence.yaml`, and returns an `authority-decision` containing:
+
+- `allow`, `deny`, or `approval_required`;
+- human-readable reasons;
+- the number of action/resource paths evaluated;
+- a signed, hash-chained ledger reference.
+
+Canonical JSON Schemas live in [`contracts/`](./contracts/).
+
+`GET /v1/authority/status/{work_id}` exposes only the resulting authorization state—`authorized`, `blocked`, or `awaiting_approval`—for AILHAT outcome and readiness tracking. It does not expose or accept portfolio priority.
+
 ### Quick start
 
 ```bash
@@ -114,7 +132,7 @@ ledgato sync --remote http://peer:8000                        # distributed cons
 ledgato api --port 8000
 ```
 
-`/health` · `/v1/actions/check` · `/v1/probes/run` · `/v1/releases/attest` ·
+`/health` · `/v1/authority/resolve` · `/v1/actions/check` · `/v1/probes/run` · `/v1/releases/attest` ·
 `/v1/ledger` (+ `status`, `chain`, `reconcile`) ·
 `/v1/attestations/verify` · `/v1/attestations/report`
 
@@ -172,3 +190,4 @@ It can deploy in the user's infrastructure (VPC / on-prem) so scopes and sensiti
 ---
 
 This repository hosts the public landing page for Ledgato (`index.html`) and the working engine (`/engine/`).
+The working product is the headless service in `/engine/`. The public page is explanatory; Agent OS and execution harnesses consume the service through contracts.

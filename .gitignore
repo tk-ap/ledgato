@@ -1,3 +1,12 @@
 # secret-adjacent local key material — must never be committed
 keys/
 lab/.state/
+.env
+.env.*
+.venv/
+.vercel/
+dist/
+ledger.jsonl
+node_modules/
+__pycache__/
+.pytest_cache/
