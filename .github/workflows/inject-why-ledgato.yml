@@ -1,0 +1,118 @@
+name: Inject plain-language LEDGATo education
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/inject-why-ledgato.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-landing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Add beginner-friendly why LEDGATo section
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text()
+          if 'id="why-ledgato"' in text:
+              raise SystemExit('Education section already present')
+
+          css = r'''
+  /* why LEDGATo — plain-language education */
+  .why-ledgato{border-bottom:1px solid var(--hair);background:var(--bg-soft)}
+  .why-grid{display:grid;grid-template-columns:.78fr 1.22fr;gap:60px;align-items:start}
+  .why-lead{font-size:clamp(1.4rem,2.5vw,2rem);line-height:1.22;letter-spacing:-.02em;margin-top:12px;max-width:520px}
+  .why-simple{margin-top:28px;border-left:2px solid var(--accent);padding-left:18px;max-width:520px}
+  .why-simple b{display:block;font-size:15px;margin-bottom:5px}
+  .why-simple p{color:var(--muted);font-size:15px}
+  .why-cards{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--hair);border-radius:10px;overflow:hidden}
+  .why-card{padding:22px;background:var(--bg);min-height:190px}
+  .why-card:nth-child(odd){border-right:1px solid var(--hair)}
+  .why-card:nth-child(-n+2){border-bottom:1px solid var(--hair)}
+  .why-card .who{font-family:var(--mono);font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
+  .why-card h3{font-size:17px;line-height:1.35;margin:12px 0 9px}
+  .why-card p{font-size:14px;color:var(--muted)}
+  .why-diff{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:26px;border:1px solid var(--hair);border-radius:10px;overflow:hidden}
+  .why-diff>div{padding:22px;background:var(--bg)}
+  .why-diff>div+div{border-left:1px solid var(--accent)}
+  .why-diff .label{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;color:var(--muted-2);letter-spacing:.05em}
+  .why-diff .with .label{color:var(--accent)}
+  .why-diff p{margin-top:9px;font-size:15px;color:var(--ink-2)}
+  @media(max-width:920px){.why-grid{grid-template-columns:1fr;gap:36px}}
+  @media(max-width:680px){.why-cards,.why-diff{grid-template-columns:1fr}.why-card:nth-child(odd){border-right:0}.why-card{border-bottom:1px solid var(--hair)}.why-card:last-child{border-bottom:0}.why-diff>div+div{border-left:0;border-top:1px solid var(--accent)}}
+'''
+          text = text.replace('  /* terminal */', css + '\n  /* terminal */', 1)
+
+          section = r'''
+<!-- WHY LEDGATO -->
+<section class="why-ledgato" id="why-ledgato">
+  <div class="wrap">
+    <div class="why-grid">
+      <div>
+        <div class="eyebrow"><b>// why LEDGATo for me?</b></div>
+        <h2 class="why-lead">If an AI agent can act for you, you should know what it is allowed to do.</h2>
+        <p class="lede">Giving an AI agent tools, accounts, data, or the ability to take actions can save real time. It also creates a simple question: what happens if the agent reaches farther than you intended?</p>
+        <div class="why-simple">
+          <b>Simply put:</b>
+          <p>LEDGATo helps you set the boundaries, check that they still hold, and stop or pause actions when an agent goes outside them.</p>
+        </div>
+      </div>
+      <div>
+        <div class="why-cards">
+          <article class="why-card">
+            <div class="who">Founder / business owner</div>
+            <h3>“I want agents to do real work, but I don't want to accidentally give them too much reach.”</h3>
+            <p>LEDGATo shows what an agent can reach and helps stop actions that fall outside the rules you approved.</p>
+          </article>
+          <article class="why-card">
+            <div class="who">Builder / engineer</div>
+            <h3>“The agent changed. How do I know its permissions did not change with it?”</h3>
+            <p>LEDGATo checks releases for permission drift before they ship and makes dangerous changes visible.</p>
+          </article>
+          <article class="why-card">
+            <div class="who">Team / operator</div>
+            <h3>“Some actions are fine automatically. Others should wait for a person.”</h3>
+            <p>LEDGATo separates what is allowed, what is denied, and what should require human approval.</p>
+          </article>
+          <article class="why-card">
+            <div class="who">Security / compliance</div>
+            <h3>“If something goes wrong, I need to know what the agent was allowed to do and what controls actually ran.”</h3>
+            <p>LEDGATo keeps evidence of the boundary, checks, decisions, and enforcement around the agent.</p>
+          </article>
+        </div>
+        <div class="why-diff">
+          <div>
+            <div class="label">Without LEDGATo</div>
+            <p>You trust that the agent still has the access you meant to give it — until something proves otherwise.</p>
+          </div>
+          <div class="with">
+            <div class="label">With LEDGATo</div>
+            <p>You can see the boundary, test it, enforce it, and keep evidence of what happened.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+'''
+          marker = '</header>\n\n<!-- WHAT IT VERIFIES -->'
+          if marker not in text:
+              raise SystemExit('Expected hero marker not found')
+          text = text.replace(marker, '</header>\n' + section + '\n<!-- WHAT IT VERIFIES -->', 1)
+          p.write_text(text)
+          PY
+      - name: Commit landing education
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "add plain-language why LEDGATo education"
+          git push origin HEAD:main
