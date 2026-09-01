@@ -1,0 +1,42 @@
+version: 0.1.0
+product_key: ledgato
+agent_os_repository: tk-ap/agent-os
+routing_source: registry/product-routing.yaml
+repository: tk-ap/ledgato
+
+local:
+  owns:
+    - governance-and-enforcement
+    - release-gating
+    - agent-scope-mapping
+    - adversarial-boundary-probing
+    - signed-attestation-evidence
+    - enforcement-evidence-when-implemented
+  produces:
+    - governance-evidence
+    - release-attestation
+    - gate-result
+    - drift-or-scope-violation-evidence
+  consumes:
+    - governed-task-reference
+    - capability-manifest
+    - declared-agent-scope
+    - applicable-policy-or-authorization-reference
+  must_not_own:
+    - generic-authorization-intelligence
+    - portfolio-prioritization
+    - context-intelligence
+    - canonical-workforce-routing
+    - generic-execution-harness
+  constraints:
+    - governance-or-enforcement-must-be-material-to-route-work-here
+    - do-not-overclaim-production-enforcement-without-runtime-evidence
+    - distinguish-engine-implementation-from-deployed-and-user-validated-enforcement
+    - signed-evidence-does-not-by-itself-grant-execution-authority
+    - production-runtime-and-buyer-proof-remain-evidence-dependent
+
+rules:
+  canonical_product_role_from_routing_source: true
+  local_metadata_may_narrow_or_add_implementation_detail: true
+  local_metadata_must_not_redefine_canonical_role: true
+  cross_product_writes_require_explicit_task_authorization: true
