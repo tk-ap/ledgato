@@ -6,6 +6,8 @@ Ledgato maps what your AI agents can actually access, probes those boundaries wi
 
 > *An unverified agent doesn't ship.*
 
+> **Product direction:** the repository now records `khrystal — Execution Intelligence` as the working successor-brand direction, with pre-ship Review as the current wedge and Verify/Learn as later expansion. This is a direction note only; the operational/public product remains Ledgato until an explicit rename implementation is approved. See [`PRODUCT_DIRECTION.md`](./PRODUCT_DIRECTION.md).
+
 ## Why
 
 Agentic systems fail silently. A tool access list, an endpoint, a data domain — any of it can drift between a security review and the next release. A one-time audit is a point-in-time snapshot; Ledgato is continuous.
