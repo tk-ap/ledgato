@@ -24,7 +24,14 @@ def client(tmp_path):
     cfg.write_text(FENCE)
     keys = tmp_path / "keys"
     ledger = tmp_path / "ledger.jsonl"
-    app = create_app(config_path=cfg, ledger_path=ledger, key_dir=keys)
+    app = create_app(
+        config_path=cfg,
+        ledger_path=ledger,
+        key_dir=keys,
+        authority_path=tmp_path / "authority.json",
+        approvals_path=tmp_path / "approvals.json",
+        adapters={},
+    )
     return TestClient(app)
 
 
@@ -39,12 +46,14 @@ def test_check_allow(client):
     r = client.post("/v1/actions/check", json={"agent": "ops-agent", "action": {"tool": "read.docs", "domain": "sandbox::x", "impact": "readonly"}})
     assert r.status_code == 200
     assert r.json()["allow"] is True
+    assert r.json()["outcome"] == "ALLOW"
 
 
 def test_check_deny(client):
     r = client.post("/v1/actions/check", json={"agent": "ops-agent", "action": {"tool": "db.write", "impact": "write"}})
     assert r.status_code == 200
     assert r.json()["allow"] is False
+    assert r.json()["outcome"] == "DENY"
 
 
 def test_unknown_agent_404(client):
@@ -97,7 +106,6 @@ def test_ledger_reconcile(client):
     chain = client.get("/v1/ledger/chain").json()["entries"]
     r = client.post("/v1/ledger/reconcile", json={"chain": chain})
     assert r.status_code == 200
-    # equal-length, valid -> keeps local
     assert r.json()["sync"]["adopted"] is False
 
 
@@ -115,4 +123,4 @@ def test_attestation_verify_and_report(client):
 def test_health_reports_difficulty(client):
     r = client.get("/health").json()
     assert "difficulty" in r
-    assert r["version"] == "0.2.0"
+    assert r["version"] == "0.3.0"
