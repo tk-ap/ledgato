@@ -12,6 +12,10 @@ on:
       - 'engine/**'
       - '.github/workflows/engine-tests.yml'
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -37,3 +41,27 @@ jobs:
       - name: Fail if tests failed
         if: steps.pytest.outcome == 'failure'
         run: exit 1
+
+  github-denial-proof:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install engine
+        run: python -m pip install -e './engine'
+      - name: Prove denied merge never crosses GitHub boundary
+        env:
+          LEDGATO_GITHUB_REPOSITORY: ${{ github.repository }}
+          LEDGATO_GITHUB_TOKEN: ${{ github.token }}
+          LEDGATO_PROOF_PULL_NUMBER: ${{ github.event.pull_request.number }}
+          LEDGATO_PROOF_STATE: .ledgato-proof
+        run: python engine/examples/prove_github_denial.py
+      - name: Upload signed proof evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-denial-proof-${{ github.run_id }}
+          path: .ledgato-proof/
