@@ -58,10 +58,15 @@ jobs:
           LEDGATO_GITHUB_TOKEN: ${{ github.token }}
           LEDGATO_PROOF_PULL_NUMBER: ${{ github.event.pull_request.number }}
           LEDGATO_PROOF_STATE: .ledgato-proof
-        run: python engine/examples/prove_github_denial.py
+        run: |
+          set -o pipefail
+          python engine/examples/prove_github_denial.py 2>&1 | tee github-denial-proof.txt
       - name: Upload signed proof evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: github-denial-proof-${{ github.run_id }}
-          path: .ledgato-proof/
+          include-hidden-files: true
+          path: |
+            github-denial-proof.txt
+            .ledgato-proof/
