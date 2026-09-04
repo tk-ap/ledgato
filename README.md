@@ -114,13 +114,17 @@ A khrystal-powered release check should be able to surface:
 
 The same assurance engine should later be embeddable at other boundaries without forcing users through a separate khrystal workflow.
 
-## Next proof milestone
+## First-client proof target
 
-The next important proof is **one real end-to-end enforced boundary**, not another dashboard or broader simulation.
+The next product claim must be **earned in a real integration**:
 
-A credible slice should show a real agent or governed workflow requesting a consequential action; task, identity, delegated authority, and evidence reaching Ledgato; **ALLOW / DENY / APPROVE** being returned; the integrated runtime/tool path obeying that decision; the decision being attested; and post-action verification recording what actually happened.
+> **LEDGATo can actually stop an AI agent from crossing a boundary it was not authorized to cross.**
 
-That is the milestone that turns the assurance thesis into observable enforcement.
+This does **not** mean merely returning `DENY`. The protected action must be routed through an enforcement point that obeys LEDGATo, so a denied action never reaches the protected system.
+
+The first proof should demonstrate a real **ALLOW** and a real **DENY**, with evidence showing what happened. The preferred initial slice is **agent-os / governed workflow → LEDGATo → GitHub protected action**, unless a controlled HTTP/MCP gateway provides a clearer non-bypassable test.
+
+See [`FIRST_CLIENT_PROOF.md`](./FIRST_CLIENT_PROOF.md) for the acceptance criteria, what does and does not count as proof, and the first-client readiness gate.
 
 ## PEART evidence model
 
