@@ -1,8 +1,8 @@
 """Allowlisted HTTP gateway adapter.
 
 The agent chooses an action name, not an arbitrary URL. The adapter owns the
-base URL, credentials, and route mapping so a DENY means no network request is
-made to the protected service.
+base URL, credentials, and route mapping so a DENY means no protected request
+is made to the downstream service.
 """
 from __future__ import annotations
 
@@ -21,6 +21,8 @@ class Route:
     path: str
     verify_method: str | None = None
     verify_path: str | None = None
+    denied_verify_method: str | None = None
+    denied_verify_path: str | None = None
 
 
 class HTTPAdapter:
@@ -72,16 +74,41 @@ class HTTPAdapter:
         route = self.routes[action.tool]
         if not route.verify_path:
             return {"verified": receipt.executed, "method": "execution_receipt", "status": receipt.status}
+        return self._readback(
+            action,
+            method=route.verify_method or "GET",
+            path=route.verify_path,
+            mode="post_action_readback",
+        )
+
+    def verify_denied(self, action: Action) -> dict[str, Any]:
+        route = self.routes.get(action.tool)
+        if not route:
+            return {"verified": True, "method": "gateway_non_execution_receipt", "configured": False}
+        if not route.denied_verify_path:
+            return {
+                "verified": True,
+                "method": "gateway_non_execution_receipt",
+                "note": "The gateway did not invoke the configured protected route.",
+            }
+        return self._readback(
+            action,
+            method=route.denied_verify_method or "GET",
+            path=route.denied_verify_path,
+            mode="denial_readback",
+        )
+
+    def _readback(self, action: Action, *, method: str, path: str, mode: str) -> dict[str, Any]:
         req = request.Request(
-            self._url(route.verify_path, action.params),
-            method=(route.verify_method or "GET").upper(),
+            self._url(path, action.params),
+            method=method.upper(),
             headers=self.headers,
         )
         with request.urlopen(req, timeout=self.timeout) as resp:  # nosec - URL is administrator-configured
             raw = resp.read().decode()
             return {
                 "verified": 200 <= resp.status < 300,
-                "method": "post_action_readback",
+                "method": mode,
                 "status": resp.status,
                 "body": _json_or_text(raw),
             }
