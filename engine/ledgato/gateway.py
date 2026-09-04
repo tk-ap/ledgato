@@ -1,8 +1,7 @@
 """Execution gateway: the boundary where Ledgato decisions become real.
 
-The gateway is intentionally separate from the decision engine. It owns the
-protected adapter credential and only invokes the downstream system after an
-ALLOW decision or a consumed approval. A DENY never calls ``execute``.
+The gateway owns protected adapter credentials and only invokes the downstream
+system after ALLOW or a consumed approval. A DENY never calls ``execute``.
 """
 from __future__ import annotations
 
@@ -13,7 +12,7 @@ from .approvals import APPROVED, ApprovalStore
 from .authority import AuthorityStore
 from .engine import ALLOW, APPROVE, DENY, Decision, detect_drift, evaluate_action
 from .ledger import Ledger
-from .models import Action, Policy
+from .models import Action, AuthorityGrant, Policy
 
 
 class EnforcementGateway:
@@ -59,8 +58,12 @@ class EnforcementGateway:
     ) -> dict[str, Any]:
         pol = self._policy(agent)
         target = self._adapter(adapter)
-        grant = self.authority.get(grant_id)
-        decision = evaluate_action(pol, action, grant=grant, task_id=task_id)
+        grant, decision = self._decide(
+            policy=pol,
+            action=action,
+            task_id=task_id,
+            grant_id=grant_id,
+        )
 
         base_evidence = {
             "task_id": task_id,
@@ -72,22 +75,13 @@ class EnforcementGateway:
         }
 
         if decision.outcome == DENY:
-            denial_verification = target.verify_denied(action)
-            evidence = {
-                **base_evidence,
-                "downstream_execute_called": False,
-                "boundary_crossed": False,
-                "verification": denial_verification,
-            }
-            entry = self.ledger.append(agent, DENY, evidence, action=action.tool)
-            return {
-                "status": DENY,
-                "executed": False,
-                "boundary_crossed": False,
-                "decision": decision.to_dict(),
-                "verification": denial_verification,
-                "attestation_id": entry.id,
-            }
+            return self._record_denial(
+                agent=agent,
+                target=target,
+                action=action,
+                decision=decision,
+                evidence=base_evidence,
+            )
 
         if decision.outcome == APPROVE:
             pending = self.approvals.request(
@@ -182,31 +176,22 @@ class EnforcementGateway:
         action = Action(**consumed.action)
         pol = self._policy(consumed.agent)
         target = self._adapter(consumed.adapter)
-        grant = self.authority.get(consumed.jit_grant_id or consumed.grant_id)
-        decision = evaluate_action(
-            pol,
-            action,
-            grant=grant,
+        effective_grant_id = consumed.jit_grant_id or consumed.grant_id
+        grant, decision = self._decide(
+            policy=pol,
+            action=action,
             task_id=consumed.task_id,
+            grant_id=effective_grant_id,
             approval_satisfied=True,
         )
         if decision.outcome != ALLOW:
-            verification = target.verify_denied(action)
-            evidence = {
-                "approval_id": consumed.id,
-                "decision": decision.to_dict(),
-                "downstream_execute_called": False,
-                "boundary_crossed": False,
-                "verification": verification,
-            }
-            entry = self.ledger.append(consumed.agent, DENY, evidence, action=action.tool)
-            return {
-                "status": DENY,
-                "executed": False,
-                "decision": decision.to_dict(),
-                "verification": verification,
-                "attestation_id": entry.id,
-            }
+            return self._record_denial(
+                agent=consumed.agent,
+                target=target,
+                action=action,
+                decision=decision,
+                evidence={"approval_id": consumed.id, "authority": grant.to_dict() if grant else None},
+            )
         return self._execute_allowed(
             agent=consumed.agent,
             target=target,
@@ -219,6 +204,68 @@ class EnforcementGateway:
             approval_id=consumed.id,
         )
 
+    def _decide(
+        self,
+        *,
+        policy: Policy,
+        action: Action,
+        task_id: str | None,
+        grant_id: str | None,
+        approval_satisfied: bool = False,
+    ) -> tuple[AuthorityGrant | None, Decision]:
+        grant = None
+        if grant_id:
+            grant = self.authority.get(grant_id)
+            if not grant:
+                raise KeyError(f"unknown authority grant '{grant_id}'")
+            valid, reason = self.authority.validate(grant_id)
+            if not valid:
+                denial_reason = reason or "authority grant is not effective"
+                return grant, Decision(
+                    allow=False,
+                    outcome=DENY,
+                    reason=f"DENY: {denial_reason}",
+                    reasons=[denial_reason],
+                    policy=policy.agent,
+                    on_deny=list(policy.on_deny),
+                    grant_id=grant.id,
+                )
+        decision = evaluate_action(
+            policy,
+            action,
+            grant=grant,
+            task_id=task_id,
+            approval_satisfied=approval_satisfied,
+        )
+        return grant, decision
+
+    def _record_denial(
+        self,
+        *,
+        agent: str,
+        target: EnforcementAdapter,
+        action: Action,
+        decision: Decision,
+        evidence: dict[str, Any],
+    ) -> dict[str, Any]:
+        denial_verification = target.verify_denied(action)
+        final_evidence = {
+            **evidence,
+            "decision": decision.to_dict(),
+            "downstream_execute_called": False,
+            "boundary_crossed": False,
+            "verification": denial_verification,
+        }
+        entry = self.ledger.append(agent, DENY, final_evidence, action=action.tool)
+        return {
+            "status": DENY,
+            "executed": False,
+            "boundary_crossed": False,
+            "decision": decision.to_dict(),
+            "verification": denial_verification,
+            "attestation_id": entry.id,
+        }
+
     def _execute_allowed(
         self,
         *,
@@ -228,7 +275,7 @@ class EnforcementGateway:
         action: Action,
         decision: Decision,
         task_id: str | None,
-        grant: Any,
+        grant: AuthorityGrant | None,
         requested_by: str | None,
         approval_id: str | None,
     ) -> dict[str, Any]:
@@ -276,6 +323,4 @@ def _declared_for_adapter(policy: Policy, adapter: str, observed: set[str]) -> s
     prefixed = {t for t in policy.allow_tools if t.startswith(adapter + ".")}
     if prefixed:
         return prefixed
-    # For generic adapters without a namespace, only compare capabilities that
-    # the adapter itself can expose; this avoids false drift from other surfaces.
     return set(policy.allow_tools) & observed
