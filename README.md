@@ -16,18 +16,50 @@ A one-time security review is only a snapshot. The assurance problem is continuo
 
 > **Is this agent authorized to cross this boundary, under this task, with this evidence, right now?**
 
-Ledgato/khrystal is intended to make that question enforceable and provable without becoming a second agent runtime or a generic observability stack.
+Ledgato/khrystal is intended to make that question enforceable and provable without becoming a second agent runtime, an identity provider, or a generic observability stack.
+
+## Product boundary
+
+Ledgato/khrystal is **not** trying to replace IAM, credential issuance, or the system that actually executes agent work.
+
+A useful division of responsibility is:
+
+- **Identity / IAM** — establishes the agent or workload identity, credentials, roles, and baseline grants.
+- **agent-os / runtime / host** — performs the governed work.
+- **Ledgato / khrystal** — independently evaluates consequential uses of authority, challenges declared boundaries, returns **ALLOW / DENY / APPROVE**, records provenance/evidence, and verifies whether reality stayed inside what was authorized.
+
+The phrase **authorization control plane** can describe an integration mechanism, but the working product category is **Agent Assurance**. The differentiated question is not merely “what permissions does this agent have?” It is:
+
+> **Given this agent, this task, this delegated authority, this requested action, and this evidence: should this boundary be crossed right now?**
 
 ## What it does
 
-1. **Declare & map** — Represent the tools, data domains, endpoints, impact, and other authority an agent is intended to have, then compare that declaration with the surface it can reach.
-2. **Probe** — Run adversarial checks for scope escape, impact escalation, exfiltration, injection, and other boundary failures.
-3. **Decide** — Resolve consequential boundary requests as **ALLOW / DENY / APPROVE** according to policy, task context, and evidence.
+1. **Discover / declare** — Represent the tools, data domains, endpoints, impact, credentials, and other authority an agent can reach and is intended to have.
+2. **Probe / verify** — Run adversarial checks for scope escape, impact escalation, exfiltration, injection, and other boundary failures.
+3. **Decide** — Resolve consequential boundary requests as **ALLOW / DENY / APPROVE** according to policy, task context, authority provenance, and evidence.
 4. **Enforce where integrated** — Feed the decision into the tool proxy, execution control plane, GitHub/CI gate, deployment path, or external system that can actually allow or block the action.
-5. **Attest** — Produce signed/tamper-evident evidence of what was tested, requested, decided, and authorized.
-6. **Gate releases** — Use the same assurance model at PR, merge, and deployment boundaries through **Agent Release Assurance**.
+5. **Attest / prove** — Produce signed/tamper-evident evidence of what was tested, requested, delegated, decided, and authorized.
+6. **Verify outcomes** — Compare what actually happened with the authority and result that were approved.
+7. **Gate releases** — Use the same assurance model at PR, merge, and deployment boundaries through **Agent Release Assurance**.
 
 The product should reduce reachable authority and blast radius where its integrations can enforce policy. It does **not** claim to prevent every exploit, escape, zero-day, or malicious behavior.
+
+## Authority provenance
+
+Authority is not just a permission bit. For consequential actions, Ledgato/khrystal should increasingly be able to explain:
+
+- who or what granted the authority;
+- why and for which task/workflow it was granted;
+- which identity, credential, role, or token carries it;
+- the agent's effective reachable authority versus declared scope;
+- whether the authority is direct, borrowed, or delegated;
+- when it expires;
+- whether it has drifted;
+- whether and how it can be revoked;
+- what decision was made when the authority was exercised;
+- what actually happened afterward.
+
+Future aligned work includes just-in-time / expiring grants and revocation-aware assurance. Ledgato/khrystal should consume and evaluate upstream identity/grant state rather than recreate the identity provider.
 
 ## The engine (working MVP)
 
@@ -81,6 +113,26 @@ A khrystal-powered release check should be able to surface:
 - a durable attestation of the decision.
 
 The same assurance engine should later be embeddable at other boundaries without forcing users through a separate khrystal workflow.
+
+## Next proof milestone
+
+The next important proof is **one real end-to-end enforced boundary**, not another dashboard or broader simulation.
+
+A credible slice should show a real agent or governed workflow requesting a consequential action; task, identity, delegated authority, and evidence reaching Ledgato; **ALLOW / DENY / APPROVE** being returned; the integrated runtime/tool path obeying that decision; the decision being attested; and post-action verification recording what actually happened.
+
+That is the milestone that turns the assurance thesis into observable enforcement.
+
+## PEART evidence model
+
+PEART remains an internal assurance/evidence model:
+
+- **P — Provenance**: task, workflow, agent, harness, host, model, initiator, delegator, and authority source.
+- **E — Evidence**: tests, artifacts, validations, probe results, receipts, and supporting outputs.
+- **A — Authority**: policy, permissions, budget, environment, grant/delegation chain, effective authority, expiry, revocation state, and approval context.
+- **R — Result**: expected result before execution and actual result after verification.
+- **T — Trace**: ordered actions, handoffs, retries, boundary requests, grants/revocations, and decisions.
+
+The goal is for accountability to be **derived from evidence** rather than treated as a vague field.
 
 ## Deployment and embedding
 
