@@ -20,7 +20,7 @@ from .approvals import ApprovalStore
 from .authority import AuthorityStore
 from .crypto import Signer
 from .distributed import Node
-from .engine import detect_drift, evaluate_action
+from .engine import DENY, Decision, evaluate_action
 from .gate import attest_release
 from .gateway import EnforcementGateway
 from .ledger import Ledger
@@ -53,6 +53,11 @@ class AttestRequest(BaseModel):
     actions: list[ActionIn] = Field(default_factory=list)
     observed_scope: Optional[list[str]] = None
     drift: bool = False
+
+
+class AttestVerifyIn(BaseModel):
+    agent: str
+    release: str
 
 
 class DiscoveryRequest(BaseModel):
@@ -106,6 +111,13 @@ def _action(a: ActionIn) -> Action:
     return Action(tool=a.tool, params=a.params, domain=a.domain, impact=a.impact, intent=a.intent)
 
 
+def _model_dict(model: BaseModel) -> dict[str, Any]:
+    """Support both Pydantic v1 and v2 for client deployments."""
+    if hasattr(model, "model_dump"):
+        return model.model_dump()
+    return model.dict()
+
+
 def create_app(
     config_path: str | Path = "fence.yaml",
     ledger_path: str | Path = "ledger.jsonl",
@@ -128,7 +140,6 @@ def create_app(
     policies: dict[str, Policy] = {}
     if config_path.exists():
         import yaml
-
         policies = load_policies(yaml.safe_load(config_path.read_text()) or {})
 
     ledger = Ledger(signer=signer, path=Path(ledger_path), difficulty=int(difficulty))
@@ -181,10 +192,27 @@ def create_app(
 
     @app.post("/v1/actions/check", dependencies=[Depends(_auth)])
     def check(req: CheckRequest):
-        grant = authority.get(req.grant_id)
-        decision = evaluate_action(
-            _policy(req.agent), _action(req.action), grant=grant, task_id=req.task_id
-        )
+        policy = _policy(req.agent)
+        grant = None
+        if req.grant_id:
+            grant = authority.get(req.grant_id)
+            if not grant:
+                raise HTTPException(404, f"unknown authority grant '{req.grant_id}'")
+            valid, reason = authority.validate(req.grant_id)
+            if not valid:
+                decision = Decision(
+                    allow=False,
+                    outcome=DENY,
+                    reason=f"DENY: {reason or 'authority grant is not effective'}",
+                    reasons=[reason or "authority grant is not effective"],
+                    policy=policy.agent,
+                    on_deny=list(policy.on_deny),
+                    grant_id=grant.id,
+                )
+            else:
+                decision = evaluate_action(policy, _action(req.action), grant=grant, task_id=req.task_id)
+        else:
+            decision = evaluate_action(policy, _action(req.action), task_id=req.task_id)
         ledger.append(
             req.agent,
             decision.outcome,
@@ -222,13 +250,11 @@ def create_app(
 
     @app.post("/v1/authority/grants", dependencies=[Depends(_auth)])
     def issue_grant(req: GrantIssueRequest):
-        grant = authority.issue(**req.model_dump())
-        ledger.append(
-            req.agent,
-            "GRANTED",
-            {"authority": grant.to_dict()},
-            action="authority.grant",
-        )
+        try:
+            grant = authority.issue(**_model_dict(req))
+        except (KeyError, ValueError) as exc:
+            raise HTTPException(409, str(exc)) from exc
+        ledger.append(req.agent, "GRANTED", {"authority": grant.to_dict()}, action="authority.grant")
         return grant.to_dict()
 
     @app.get("/v1/authority/grants", dependencies=[Depends(_auth)])
@@ -241,12 +267,7 @@ def create_app(
             grant = authority.revoke(grant_id, revoked_by=req.revoked_by, reason=req.reason)
         except KeyError as exc:
             raise HTTPException(404, f"unknown grant '{grant_id}'") from exc
-        ledger.append(
-            grant.agent,
-            "REVOKED",
-            {"authority": grant.to_dict()},
-            action="authority.revoke",
-        )
+        ledger.append(grant.agent, "REVOKED", {"authority": grant.to_dict()}, action="authority.revoke")
         return grant.to_dict()
 
     @app.get("/v1/approvals", dependencies=[Depends(_auth)])
@@ -343,10 +364,6 @@ def create_app(
         remote = body.get("chain", [])
         result = node.reconcile(remote)
         return {"sync": result.to_dict(), "entries": len(ledger.entries)}
-
-    class AttestVerifyIn(BaseModel):
-        agent: str
-        release: str
 
     @app.post("/v1/attestations/verify", dependencies=[Depends(_auth)])
     def attest_verify(req: AttestVerifyIn):
