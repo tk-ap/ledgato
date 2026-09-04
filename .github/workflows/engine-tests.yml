@@ -23,4 +23,17 @@ jobs:
       - name: Install
         run: python -m pip install -e './engine[dev]'
       - name: Test
-        run: pytest -q engine/tests
+        id: pytest
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          pytest -q engine/tests 2>&1 | tee pytest-output.txt
+      - name: Upload pytest output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-${{ github.run_id }}
+          path: pytest-output.txt
+      - name: Fail if tests failed
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1
