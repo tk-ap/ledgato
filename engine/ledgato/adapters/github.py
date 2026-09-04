@@ -91,6 +91,24 @@ class GitHubAdapter:
             }
         return {"verified": False, "reason": "unsupported verification action"}
 
+    def verify_denied(self, action: Action) -> dict[str, Any]:
+        if action.tool == "github.pull.merge":
+            number = _required_int(action.params, "pull_number")
+            pr = self._call("GET", f"/repos/{self.repository}/pulls/{number}")
+            merged = bool(pr.get("merged_at"))
+            return {
+                "verified": not merged,
+                "method": "github_pull_denial_readback",
+                "merged": merged,
+                "merged_at": pr.get("merged_at"),
+                "note": "Gateway made no merge call; readback confirms the PR remains unmerged.",
+            }
+        return {
+            "verified": True,
+            "method": "gateway_non_execution_receipt",
+            "note": "Gateway did not invoke the downstream adapter for this denied action.",
+        }
+
     def _call(self, method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         data = json.dumps(body).encode() if body is not None else None
         req = request.Request(
