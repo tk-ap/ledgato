@@ -111,7 +111,10 @@ def test_ledger_reconcile(client):
 
 def test_attestation_verify_and_report(client):
     client.post("/v1/releases/attest", json={"agent": "ops-agent", "release": "v1.0"})
-    v = client.post("/v1/attestations/verify", json={"agent": "ops-agent", "release": "v1.0"}).json()
+    response = client.post("/v1/attestations/verify", json={"agent": "ops-agent", "release": "v1.0"})
+    assert response.status_code == 200, response.text
+    v = response.json()
+    print("attestation verify response:", v)
     assert v["verdict"] == "APPROVED"
     assert v["verified"] is True
     rep = client.post("/v1/attestations/report", json={"agent": "ops-agent", "release": "v1.0"}).json()
