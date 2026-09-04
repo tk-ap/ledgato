@@ -37,4 +37,7 @@ class EnforcementAdapter(Protocol):
         """Perform an already-authorized action."""
 
     def verify(self, action: Action, receipt: ExecutionReceipt) -> dict[str, Any]:
-        """Check the downstream system after execution and return evidence."""
+        """Read the downstream system after execution and return evidence."""
+
+    def verify_denied(self, action: Action) -> dict[str, Any]:
+        """Read downstream state without executing the denied action."""
