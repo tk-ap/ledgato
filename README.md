@@ -8,6 +8,16 @@ Ledgato declares and maps the authority an AI agent is intended to have, probes 
 
 > **Product direction:** this repository records **`khrystal — Agent Assurance`** as the working successor-brand/category direction. **Agent Release Assurance** is the first concrete wedge, not the full product definition. The operational/public product remains Ledgato until an explicit rename implementation is approved. See [`PRODUCT_DIRECTION.md`](./PRODUCT_DIRECTION.md).
 
+## Current go-to-market decision
+
+Ledgato is not entering the market as a universal “AI control” platform. The first commercial wedge is deliberately narrower:
+
+> **Change control for autonomous coding agents: let agents work, but independently authorize and prove every merge, deployment, secret access, and destructive infrastructure change.**
+
+The first offer is a **six-week design-partner pilot** for small AI-native software teams already allowing coding agents to make or propose consequential changes. The pilot must place at least one real action behind a non-bypassable Ledgato enforcement path, measure whether unsafe or unauthorized actions are stopped without making normal work unusable, and end with a paid-continuation decision.
+
+This is a validation-first investment. Do not expand the product, rename it, or market it as production-proven until the customer and technical gates in [`GO_TO_MARKET.md`](./GO_TO_MARKET.md) have been met. The recruiting plan, qualification rules, interview script, and outreach copy are in [`DESIGN_PARTNER_RECRUITING.md`](./DESIGN_PARTNER_RECRUITING.md).
+
 ## Why
 
 Agentic systems can cross important boundaries before a pull request or deployment ever exists. Tool access, credentials, data domains, external endpoints, impact levels, infrastructure permissions, and release authority can all drift beyond what a task actually requires.
