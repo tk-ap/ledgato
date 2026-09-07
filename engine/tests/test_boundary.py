@@ -64,14 +64,19 @@ def test_cannot_mark_verified_on_decisions_alone(lab):
     assert lab.get("github_lab_merge").bypass_status == "UNVERIFIED"
 
 
+def _full_suite(lab):
+    """Minimum evidence set the VERIFIED gate now demands."""
+    for kind in ("bypass_attempt", "leakage_attempt",
+                 "escalation_attempt", "approval_abuse_attempt"):
+        lab.record_evidence("github_lab_merge", kind=kind, summary=f"{kind} probe",
+                            outcome="rejected", protected_action_occurred=False)
+    lab.record_evidence("github_lab_merge", kind="provider_readback",
+                        summary="provider confirms no unauthorized merge",
+                        outcome="confirmed", provider_ref="pull/1")
+
+
 def test_verified_allowed_after_failed_bypass_attempts(lab):
-    lab.record_evidence(
-        "github_lab_merge",
-        kind="bypass_attempt",
-        summary="direct merge API with agent credential",
-        outcome="rejected",
-        protected_action_occurred=False,
-    )
+    _full_suite(lab)
     boundary = lab.set_status(
         "github_lab_merge",
         "VERIFIED",
@@ -233,11 +238,7 @@ def test_remediated_and_retested_boundary_can_reach_verified(lab):
         "github_lab_merge", kind="remediation",
         summary="consume() now locks and re-reads", outcome="fixed",
     )
-    lab.record_evidence(
-        "github_lab_merge", kind="bypass_attempt",
-        summary="16 processes x 15 runs", outcome="exactly one merge",
-        protected_action_occurred=False,
-    )
+    _full_suite(lab)
 
     boundary = lab.set_status(
         "github_lab_merge", "VERIFIED",
@@ -258,6 +259,7 @@ def test_historical_breach_is_never_erased(lab):
         "github_lab_merge", kind="bypass_attempt", summary="retest",
         outcome="rejected", protected_action_occurred=False,
     )
+    _full_suite(lab)
     lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="j")
 
     boundary = lab.get("github_lab_merge")
@@ -292,13 +294,59 @@ def test_retest_before_remediation_does_not_count(lab):
 
 
 def test_new_breach_after_verification_relatches(lab):
-    lab.record_evidence(
-        "github_lab_merge", kind="bypass_attempt", summary="probe",
-        outcome="rejected", protected_action_occurred=False,
-    )
+    _full_suite(lab)
     lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="j")
     lab.record_evidence(
         "github_lab_merge", kind="bypass_attempt", summary="new vector",
         outcome="merged", protected_action_occurred=True,
     )
     assert lab.get("github_lab_merge").bypass_status == "BYPASS_FOUND"
+
+
+# --- VERIFIED requires full coverage, not a partial suite -----------------
+
+def _clean(store, kind, summary="probe"):
+    store.record_evidence("github_lab_merge", kind=kind, summary=summary,
+                          outcome="rejected", protected_action_occurred=False)
+
+
+def test_one_attack_family_does_not_verify(lab):
+    """Self-caught defect: passing only the leakage family reached VERIFIED.
+
+    A boundary tested for credential leakage says nothing about whether a
+    direct provider call bypasses the gateway.
+    """
+    _clean(lab, "leakage_attempt")
+    with pytest.raises(ValueError, match="attack famil"):
+        lab.set_status("github_lab_merge", "VERIFIED", attested_by="c", justification="j")
+    assert lab.get("github_lab_merge").bypass_status == "UNVERIFIED"
+
+
+def test_all_families_but_no_provider_readback_does_not_verify(lab):
+    """Every family can be satisfied by in-process fakes; that is not proof."""
+    for kind in ("bypass_attempt", "leakage_attempt",
+                 "escalation_attempt", "approval_abuse_attempt"):
+        _clean(lab, kind)
+    with pytest.raises(ValueError, match="no provider_readback"):
+        lab.set_status("github_lab_merge", "VERIFIED", attested_by="c", justification="j")
+    assert lab.get("github_lab_merge").bypass_status == "UNVERIFIED"
+
+
+def test_full_coverage_plus_provider_readback_verifies(lab):
+    for kind in ("bypass_attempt", "leakage_attempt",
+                 "escalation_attempt", "approval_abuse_attempt"):
+        _clean(lab, kind)
+    lab.record_evidence("github_lab_merge", kind="provider_readback",
+                        summary="github confirms PR #1 unmerged after DENY",
+                        outcome="confirmed", protected_action_occurred=False,
+                        provider_ref="pull/1")
+    boundary = lab.set_status("github_lab_merge", "VERIFIED",
+                              attested_by="reviewer", justification="full suite + readback")
+    assert boundary.bypass_status == "VERIFIED"
+
+
+def test_provider_readback_alone_does_not_verify(lab):
+    lab.record_evidence("github_lab_merge", kind="provider_readback",
+                        summary="readback", outcome="confirmed")
+    with pytest.raises(ValueError, match="no bypass/leakage/escalation attempts"):
+        lab.set_status("github_lab_merge", "VERIFIED", attested_by="c", justification="j")

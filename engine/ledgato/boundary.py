@@ -42,6 +42,13 @@ BYPASS_EVIDENCE_KINDS: frozenset[str] = frozenset(
 #: but never sufficient to claim bypass resistance.
 DECISION_EVIDENCE_KINDS: frozenset[str] = frozenset({"decision", "provider_readback"})
 
+#: Attack families that must all be exercised before VERIFIED is available.
+#: Mirrors the directive's attack suite: a boundary tested only for credential
+#: leakage says nothing about direct-provider bypass, and vice versa.
+REQUIRED_ATTACK_FAMILIES: frozenset[str] = frozenset(
+    {"bypass_attempt", "leakage_attempt", "escalation_attempt", "approval_abuse_attempt"}
+)
+
 
 @dataclass
 class BoundaryEvidence:
@@ -327,6 +334,24 @@ class BoundaryStore:
                 raise ValueError(
                     f"cannot mark VERIFIED: {len(unresolved)} recorded breach(es) lack "
                     "remediation followed by a clean adversarial retest"
+                )
+
+            # Coverage: passing one attack family says nothing about the others.
+            tested = {e.kind for e in attempts}
+            missing = REQUIRED_ATTACK_FAMILIES - tested
+            if missing:
+                raise ValueError(
+                    "cannot mark VERIFIED: no evidence for attack "
+                    f"{'family' if len(missing) == 1 else 'families'} "
+                    f"{sorted(missing)}; a partial suite is not verification"
+                )
+
+            # The boundary must actually have been exercised against the real
+            # provider. Everything above can be satisfied by in-process fakes.
+            if not any(e.kind == "provider_readback" for e in boundary.verification_evidence):
+                raise ValueError(
+                    "cannot mark VERIFIED: no provider_readback evidence; the boundary "
+                    "has never been confirmed against the live provider"
                 )
 
         if boundary.bypass_status == "BYPASS_FOUND" and status != "BYPASS_FOUND":
