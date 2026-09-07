@@ -10,7 +10,7 @@ This record reconciles the external-user readiness review against current `main`
 | --- | --- | --- |
 | Interview-ready | **YES** | Problem interviews do not require an installed customer environment. |
 | Founder-led demo | **CONDITIONAL** | The public/demo experience can explain the product, but illustrative state must not be confused with externally verified enforcement. |
-| Design-partner-ready | **NOT YET** | A fresh-repository GitHub integration still must pass credential-isolation, restart, deny, approve/resume, exactly-once, and downstream verification gates. |
+| Design-partner-ready | **NOT YET** | A fresh-repository GitHub integration still must pass credential-isolation, real pilot restart, approve/resume, exactly-once, and downstream verification gates. |
 | Self-serve-ready | **NO / DEFERRED** | Full onboarding, tenant operations, billing/admin and generalized integrations should follow design-partner evidence. |
 
 ## What is already implemented
@@ -45,7 +45,7 @@ The next step is not a broad rewrite. It is turning the existing foundation into
 
 ### Constraint
 
-This persistence model is suitable only for a deliberately constrained **single-process pilot** after restart testing. Plain JSON files do not establish safe multi-instance concurrency.
+This persistence model is suitable only for a deliberately constrained **single-process pilot** after real deployment restart testing. Plain JSON files do not establish safe multi-instance concurrency.
 
 ### Idempotency remediation on this branch
 
@@ -61,9 +61,16 @@ Behavior:
 - state writes use a temporary file + replace operation to reduce partial-write risk in the single-process pilot model;
 - the Python SDK exposes the same idempotency key.
 
-Regression tests were added for same-process replay, restart replay, conflicting-key rejection, and unresolved-PENDING fail-closed behavior.
+Regression coverage includes same-process replay, store reload/restart replay, conflicting-key rejection, unresolved-PENDING fail-closed behavior, API replay, and API service recreation.
 
-**Evidence status:** implementation and tests are present on the branch. They are not considered proven until CI/test execution confirms them.
+### Validation result
+
+GitHub Actions run `34150297103` completed successfully on this branch:
+
+- `test`: **SUCCESS** — install and full test step completed successfully;
+- `github-denial-proof`: **SUCCESS** — the existing real GitHub denial proof still passed and uploaded signed proof evidence.
+
+This validates the branch in CI, including the new idempotency regression coverage. It does **not** substitute for a real external pilot restart/no-bypass test.
 
 ### Important boundary
 
@@ -131,18 +138,17 @@ The runbook defines credential custody, no-bypass proof, policy setup, durable s
 | Public claim boundary | **Canonical repo language bounded; live production unresolved** | Identify Vercel production source, patch there, verify live. |
 | Canonical GitHub integration path | **RUNBOOK DEFINED** | Exercise on a fresh external repository. |
 | Credential custody | **CONTRACT DEFINED** | Verify in pilot environment and record bypass test. |
-| Durable state | **PARTIALLY IMPLEMENTED** | Run restart tests; do not claim multi-instance safety. |
-| Idempotency | **IMPLEMENTED ON BRANCH / UNVERIFIED** | CI + API/restart validation before merge/proof claim. |
-| Fail-closed behavior | **GATE DEFINED + IDEMPOTENCY FAIL-CLOSED ADDED** | Verify harness cannot bypass on outage/error. |
+| Durable state | **CI RECREATION TESTED; REAL PILOT RESTART STILL REQUIRED** | Run actual service restart on pilot host; do not claim multi-instance safety. |
+| Idempotency | **CI VERIFIED ON BRANCH** | Validate against the real GitHub pilot path before calling external proof complete. |
+| Fail-closed behavior | **GATE DEFINED + IDEMPOTENCY FAIL-CLOSED VERIFIED IN CI** | Verify harness cannot bypass on outage/error. |
 | Fresh external E2E proof | **NOT RUN** | Requires fresh repo and explicit credential/repository authorization. |
 
 ## Next gates
 
-1. Run CI/test suite and remediate any regression.
-2. Add/execute API-level regression for `idempotency_key` and service recreation.
-3. Run persistence/restart tests across approval, authority, idempotency and ledger state.
-4. Identify the production Vercel source and reconcile live claims without broadening scope.
-5. Run fresh-repository GitHub E2E only with explicit external credential/repository authorization.
+1. Identify the production Vercel source and reconcile live claims without broadening scope.
+2. Run real pilot persistence/restart checks across approval, authority, idempotency and ledger state.
+3. Verify the governed harness has no direct/fail-open GitHub credential path.
+4. Run the fresh-repository GitHub E2E only with explicit external credential/repository authorization.
 
 ## Non-goals
 
