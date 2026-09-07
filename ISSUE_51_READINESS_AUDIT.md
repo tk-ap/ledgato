@@ -2,7 +2,7 @@
 
 Date: 2026-09-07
 
-This record reconciles the external-user readiness review against current `main` before additional implementation.
+This record reconciles the external-user readiness review against current `main` and the bounded remediation performed on the Issue #51 branch.
 
 ## Readiness result
 
@@ -33,12 +33,13 @@ This means the next step is not a broad rewrite. It is turning the existing foun
 
 ### Existing support
 
-`create_app()` defaults to file-backed state paths:
+`create_app()` uses file-backed state paths for:
 
 - `ledger.jsonl`;
 - `authority.json`;
 - `approvals.json`;
-- signing keys under `keys/`.
+- signing keys under `keys/`;
+- on this branch, protected-execution idempotency in `idempotency.json`.
 
 `AuthorityStore` loads/saves grants when a path is configured. `ApprovalStore` loads/saves pending/decided/consumed approvals when a path is configured. The ledger is also file-backed.
 
@@ -46,21 +47,33 @@ This means the next step is not a broad rewrite. It is turning the existing foun
 
 This persistence model is suitable only for a deliberately constrained single-process pilot after restart testing. Plain JSON files do not establish safe multi-instance concurrency.
 
-### Remaining idempotency gap
+### Idempotency remediation on this branch
 
-Approval/resume has a useful exactly-once property: after a valid resume token is consumed, approval state becomes `CONSUMED`, so the same approval cannot be resumed again.
+The Issue #51 branch adds `IdempotencyStore` and an optional caller-supplied `idempotency_key` on protected gateway execution.
 
-However, `EnforcementGateway._execute_allowed()` currently invokes the protected adapter on every direct allowed request. There is no general request/idempotency key checked before adapter execution and no persistent execution-result cache keyed to a caller-supplied operation identifier.
+Behavior:
 
-**Result:** general request-level idempotency remains P0 before the pilot is represented as safely retryable.
+- the first request records a durable `PENDING` operation before policy/adapter execution proceeds;
+- a completed operation stores the full gateway result and returns that result on identical retries without invoking the protected adapter again;
+- reuse of the same key with a different request fingerprint is rejected;
+- an operation left `PENDING` after an uncertain/crashed attempt fails closed after restart rather than risking another protected execution;
+- state writes use a temporary file + replace operation to reduce partial-write risk in the single-process pilot model.
 
-Do not hide this behind the one-time approval behavior.
+Regression tests were added for same-process replay, restart replay, conflicting-key rejection, and unresolved-PENDING fail-closed behavior.
+
+**Evidence status:** implementation and tests are present on the branch. They are not considered proven until CI/test execution confirms them.
+
+### Important boundary
+
+This is not a distributed idempotency service or a transaction coordinated with GitHub. If a process dies after a downstream action but before the local result is completed, the durable record remains `PENDING`; the safe behavior is to stop and verify downstream state rather than automatically retry.
 
 ## Fail-closed audit
 
 ### Gateway behavior
 
 Within the gateway, missing policy/adapter/authority state produces an error or denial rather than silently returning `ALLOW`. A policy `DENY` never calls the protected adapter.
+
+The new idempotency path also fails closed on an unresolved prior operation instead of retrying an action whose downstream outcome may be uncertain.
 
 ### System behavior still required
 
@@ -105,6 +118,8 @@ Public language should reflect this condition:
 
 Demo/illustrative content should be visibly distinct from real external proof.
 
+The branch README has been tightened to this bounded claim, but that is repository documentation only until the production Vercel source is reconciled and deployed.
+
 ## Canonical first-pilot path
 
 The exact operating path is now recorded in `DESIGN_PARTNER_GITHUB_PILOT.md`:
@@ -119,6 +134,7 @@ The runbook defines:
 - no-bypass proof;
 - policy setup;
 - durable state paths;
+- request idempotency;
 - DENY proof;
 - APPROVE/resume proof;
 - restart test;
@@ -128,22 +144,23 @@ The runbook defines:
 
 ## P0 status after this tranche
 
-| P0 item | Status after audit | Next action |
+| P0 item | Status after remediation | Next action |
 | --- | --- | --- |
 | Public claim boundary | **Repo language tightened; live production unresolved** | Identify Vercel production source, then patch and verify live copy. |
 | Canonical GitHub integration path | **RUNBOOK DEFINED** | Exercise it on a fresh external repository. |
 | Credential custody | **CONTRACT DEFINED** | Implement/verify against the pilot environment and record bypass test. |
 | Durable state | **PARTIALLY IMPLEMENTED** | Run restart test; do not claim multi-instance safety. |
-| Idempotency | **GAP** | Add general persistent request-level idempotency for protected execution or deliberately constrain first pilot to a path that provides equivalent exactly-once semantics. |
-| Fail-closed behavior | **GATE DEFINED** | Verify harness cannot bypass on outage/error. |
+| Idempotency | **IMPLEMENTED ON BRANCH / UNVERIFIED** | Run CI and restart tests; remediate any failures before merge. |
+| Fail-closed behavior | **GATE DEFINED + IDEMPOTENCY FAIL-CLOSED ADDED** | Verify harness cannot bypass on outage/error. |
 | Fresh external E2E proof | **NOT RUN** | Requires external/fresh repo and credential authorization; do not fabricate. |
 
-## Recommended next implementation tranche
+## Recommended next tranche
 
-1. Add request-level idempotency to the gateway/API with a caller-supplied operation key, persistence across restart, and regression tests proving duplicate retries invoke the protected adapter no more than once.
-2. Run persistence/restart tests across approval, authority and idempotency state.
-3. Identify the production Vercel source and reconcile public claims without broadening scope.
-4. Run the fresh-repository GitHub E2E only after explicit external credential/repository authorization is available.
+1. Run CI/test suite for the Issue #51 branch and fix any regression.
+2. Add/execute an API-level regression proving `idempotency_key` survives service recreation and duplicate calls return the original result.
+3. Run persistence/restart tests across approval, authority, idempotency and ledger state.
+4. Identify the production Vercel source and reconcile public claims without broadening scope.
+5. Run the fresh-repository GitHub E2E only after explicit external credential/repository authorization is available.
 
 ## Non-goals
 
