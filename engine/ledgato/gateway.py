@@ -11,6 +11,7 @@ from .adapters.base import EnforcementAdapter, ExecutionReceipt
 from .approvals import APPROVED, ApprovalStore
 from .authority import AuthorityStore
 from .engine import ALLOW, APPROVE, DENY, Decision, detect_drift, evaluate_action
+from .idempotency import IdempotencyStore
 from .ledger import Ledger
 from .models import Action, AuthorityGrant, Policy
 
@@ -24,12 +25,14 @@ class EnforcementGateway:
         ledger: Ledger,
         authority: AuthorityStore | None = None,
         approvals: ApprovalStore | None = None,
+        idempotency: IdempotencyStore | None = None,
     ):
         self.policies = policies
         self.adapters = adapters
         self.ledger = ledger
         self.authority = authority or AuthorityStore()
         self.approvals = approvals or ApprovalStore()
+        self.idempotency = idempotency or IdempotencyStore()
 
     def discover(self, *, agent: str, adapter: str) -> dict[str, Any]:
         pol = self._policy(agent)
@@ -55,7 +58,21 @@ class EnforcementGateway:
         task_id: str | None = None,
         grant_id: str | None = None,
         requested_by: str | None = None,
+        idempotency_key: str | None = None,
     ) -> dict[str, Any]:
+        request_record = {
+            "agent": agent,
+            "adapter": adapter,
+            "action": action.to_dict(),
+            "task_id": task_id,
+            "grant_id": grant_id,
+            "requested_by": requested_by,
+        }
+        if idempotency_key:
+            cached = self.idempotency.begin(idempotency_key, request_record)
+            if cached is not None:
+                return {**cached, "idempotent_replay": True}
+
         pol = self._policy(agent)
         target = self._adapter(adapter)
         grant, decision = self._decide(
@@ -72,16 +89,18 @@ class EnforcementGateway:
             "decision": decision.to_dict(),
             "authority": grant.to_dict() if grant else None,
             "requested_by": requested_by,
+            "idempotency_key": idempotency_key,
         }
 
         if decision.outcome == DENY:
-            return self._record_denial(
+            result = self._record_denial(
                 agent=agent,
                 target=target,
                 action=action,
                 decision=decision,
                 evidence=base_evidence,
             )
+            return self._complete_idempotent(idempotency_key, result)
 
         if decision.outcome == APPROVE:
             pending = self.approvals.request(
@@ -99,7 +118,7 @@ class EnforcementGateway:
                 "boundary_crossed": False,
             }
             entry = self.ledger.append(agent, APPROVE, evidence, action=action.tool)
-            return {
+            result = {
                 "status": APPROVE,
                 "executed": False,
                 "paused": True,
@@ -107,8 +126,9 @@ class EnforcementGateway:
                 "decision": decision.to_dict(),
                 "attestation_id": entry.id,
             }
+            return self._complete_idempotent(idempotency_key, result)
 
-        return self._execute_allowed(
+        result = self._execute_allowed(
             agent=agent,
             target=target,
             adapter=adapter,
@@ -119,6 +139,7 @@ class EnforcementGateway:
             requested_by=requested_by,
             approval_id=None,
         )
+        return self._complete_idempotent(idempotency_key, result)
 
     def approve(
         self,
@@ -305,6 +326,14 @@ class EnforcementGateway:
             "verification": verification,
             "attestation_id": entry.id,
         }
+
+    def _complete_idempotent(
+        self, idempotency_key: str | None, result: dict[str, Any]
+    ) -> dict[str, Any]:
+        if not idempotency_key:
+            return result
+        completed = self.idempotency.complete(idempotency_key, result)
+        return {**completed, "idempotency_key": idempotency_key, "idempotent_replay": False}
 
     def _policy(self, agent: str) -> Policy:
         pol = self.policies.get(agent)
