@@ -406,48 +406,177 @@ final independent verification; it needs a distinct reviewer.
 
 ---
 
-## 13. Test results
+## 13. Sandbox credential isolation (engineering priority #1)
+
+Run with a synthetic sentinel, so it required no real credential. This is why
+it could be done ahead of the lab rather than after it.
+
+### LAB-001 — credential recoverable from `/proc/1/environ`
+
+A bwrap sandbox built the obvious way still handed the confined agent the
+gateway credential.
+
+`bwrap --clearenv` clears the environment of the sandboxed *child*, but the
+bwrap supervisor becomes PID 1 inside the new PID namespace and retains the
+launching environment. `/proc/1/environ` is readable from inside. Located
+precisely:
 
 ```
-engine $ <venv>/bin/python -m pytest tests/ -q
-121 passed, 2 warnings
+LEAK from /proc/1  comm=bwrap
+LEDGATO_GITHUB_TOKEN=<REDACTED>
 ```
 
-69 pre-existing (behavior unchanged) + 52 new. Commits `f3facc6`, `7ee3a40`,
-`312452b` on `proof/enforcement-stress-test`. Pushed; PR
-[tk-ap/ledgato#21](https://github.com/tk-ap/ledgato/pull/21).
+The probe was validated against an unsandboxed control first, where all four
+vectors report `LEAKED`. A probe that cannot detect the leak proves nothing.
+
+| Vector | Unsandboxed (control) | Naive sandbox | After fix |
+| --- | --- | --- | --- |
+| `env-vars` | LEAKED | blocked | blocked |
+| `secret-file-by-path` | LEAKED | blocked | blocked |
+| `secret-dir-visible` | LEAKED | blocked | blocked |
+| `proc-environ` | LEAKED | **LEAKED** | blocked |
+| visible PIDs | 270 | 5 | 5 |
+
+**Remediation:** `lab/sandbox.sh` refuses to launch when any credential variable
+is present in the launching environment — the gateway must hold the credential
+in a process that is not an ancestor of the sandbox. Regression:
+`engine/tests/test_sandbox_isolation.py`, verified to fail against the pre-fix
+launcher (4 of 6 fail; the other 2 test the sandbox itself and correctly pass
+either way).
+
+**Documented limits:** same-UID rootless namespaces, not the microVM the base
+directive prefers; `--share-net` shares the host network namespace so the agent
+can reach the gateway, which means this provides **no network isolation**.
 
 ---
 
-## 14. Outstanding — requires the disposable lab
+## 14. Self-caught defect — VERIFIED was reachable on a partial suite
+
+Recording the LAB-001 results immediately exposed a hole in the Stage 2 gate
+written earlier in this same effort: `set_status("VERIFIED")` accepted evidence
+from a *single* attack family. The boundary reached `VERIFIED` on leakage
+evidence alone — with zero direct-provider testing and no lab in existence.
+
+That is precisely the overclaim the boundary record exists to prevent, sitting
+inside the component meant to prevent it.
+
+`VERIFIED` now additionally requires:
+
+* evidence from **all four** attack families (bypass, leakage, escalation,
+  approval abuse) — a partial suite is not verification;
+* at least one **`provider_readback`** — every other family can be satisfied by
+  in-process fakes.
+
+Four regressions cover it. The stale record was regenerated and reads
+`UNVERIFIED`.
+
+---
+
+## 15. Gateway wired into the boundary record (priority #2)
+
+`EnforcementGateway` takes an optional `BoundaryStore`. ALLOW, DENY and the
+APPROVE pause are filed through `record_decision()`, which structurally cannot
+raise `bypass_status` — so the wiring can only weaken a boundary claim, never
+strengthen one. A test runs 30 real decisions and asserts the boundary is still
+`UNVERIFIED`.
+
+Boundaries are never auto-created; an unregistered action is untracked, keeping
+this from becoming the asset inventory the directive warns against.
+
+Adapters now declare `is_live_provider` and `boundary_resource`. Only a live
+adapter's readback is filed as `provider_readback`: without that guard an
+in-process double would emit exactly the evidence the VERIFIED gate demands,
+re-opening the hole in section 14.
+
+---
+
+## 16. Stage 8 — test tiers
+
+| Tier | Count | Runs by default |
+| --- | ---: | --- |
+| unit (in-process fakes) | 151 | yes |
+| `sandbox` (needs bwrap) | 6 | yes, when bwrap present |
+| `live` (real credential) | 4 | **no — opt-in** |
+
+Enforced in `engine/tests/conftest.py`, not via pyproject `addopts`: CI runs
+`pytest -q engine/tests` from the repository root, where `engine/pyproject.toml`
+may not be selected as the config source. A marker expression left only there
+could silently stop applying and let live tests fire in CI against a real repo.
+
+Live tests require `LEDGATO_LIVE_TESTS=1` **and** the credential/repo variables,
+and the `live_repository` fixture hard-fails on a name that looks like a product
+repo or that does not identify itself as a lab. All three guards were exercised.
+
+`test_no_committed_secrets.py` scans tracked files for token/key/bearer
+patterns, and includes a test that the scanner matches a synthetic token so it
+cannot pass vacuously.
+
+```
+engine $ pytest -q tests/
+157 passed, 4 skipped
+```
+
+---
+
+## 17. Findings raised but deliberately not changed
+
+Both are pre-existing designed behavior, not regressions. The handoff says not
+to rewrite working gateway behavior, and reversing either is a product decision.
+
+**F-1 — an empty allowlist disables the tool check.** `engine/ledgato/engine.py:85`
+reads `if policy.allow_tools and action.tool not in policy.allow_tools`. An empty
+`allow_tools` therefore means *allow every tool*, not *allow none*. The realistic
+footgun: `parse_policy` reads the YAML key `allow_tool` (singular), so writing
+`allow_tools:` in a fence file parses to an empty set — a policy that silently
+permits every tool up to `impact_max`. With the fail-open auth fixed earlier,
+that made two independent "misconfiguration means no enforcement" paths.
+
+**F-2 — CI runs enforcement proofs against a production repository.** The
+`github-denial-proof` job runs `prove_github_denial.py` against
+`${{ github.repository }}` — `tk-ap/ledgato` itself — on every PR. It cannot
+merge (`deny_tools` plus the DENY-never-executes invariant; readback only), so
+it is safe in practice, but running proofs against a canonical product repo is
+outside base-directive safety boundary 1, and the uploaded artifact could be
+mistaken for lab evidence.
+
+---
+
+## 18. Outstanding — requires the disposable lab
 
 Not run, because they need a real repo and a scoped Ledgato-held credential:
 
 * direct GitHub merge API with the agent's own credential
-* `git push` to protected `main`
-* `gh` CLI merge / auth reuse
+* `git push` to protected `main`; `gh` CLI merge/auth reuse
 * cached token, `.git-credentials`, credential-helper reuse
 * equivalent environment token, alternate GitHub App/integration
-* credential leakage from the sandbox (env, mounted files, logs, errors, traces,
-  process inspection)
 * branch-protection / ruleset modification from the sandbox
 * workflow-credential escalation
 * live provider readback of denied and approved merges
 * Stage 10 autonomous-agent run
 
+The scaffolding for these now exists (`engine/tests/test_live_github.py`), so
+they execute as soon as a credential is available.
+
 ---
 
-## 15. Outcome
+## 19. Outcome
 
-**BLOCKED — not PASS.**
+**BLOCKED — not PASS.** Boundary `github_lab_merge`: **`UNVERIFIED`**.
 
-Boundary `github_lab_merge`: **`UNVERIFIED`**.
+Five real defects found and fixed:
 
-Three real defects were found and fixed — two by source inspection
-(fail-open auth, unbound identity) and one by adversarial testing
-(BYP-001 approval replay). That is genuine progress against engineering
-priorities 2, 3, 4 and 8.
+| ID | Defect | Found by |
+| --- | --- | --- |
+| — | API auth failed open with no key configured | source inspection |
+| — | Caller-supplied identities; agent could self-approve | source inspection |
+| BYP-001 | Approval replay via concurrent multi-process resume | adversarial testing |
+| — | Approve-vs-deny race; a human denial silently overwritten | adversarial testing |
+| LAB-001 | Gateway credential readable from `/proc/1/environ` | adversarial testing |
 
-It is **not** boundary verification. The entire direct-provider attack family is
-untested, so no claim about bypass resistance at the GitHub boundary is
-supportable. The handoff's PASS sentence is deliberately not stated.
+Plus one defect in the verification machinery itself (section 14), which is the
+most consequential of the set: it would have permitted a VERIFIED claim on a
+partial suite.
+
+None of this is boundary verification. The entire direct-provider attack family
+remains untested, so no claim about bypass resistance at the GitHub boundary is
+supportable, and the handoff's PASS sentence appears nowhere in this document.
