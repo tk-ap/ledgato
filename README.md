@@ -12,11 +12,30 @@ Ledgato declares and maps the authority an AI agent is intended to have, probes 
 
 Ledgato is not entering the market as a universal “AI control” platform. The first commercial wedge is deliberately narrower:
 
-> **Change control for autonomous coding agents: let agents work, but independently authorize and prove every merge, deployment, secret access, and destructive infrastructure change.**
+> **Change control for autonomous coding agents: let agents work, but place selected merges, deployments, secret access, and destructive infrastructure changes behind an independent authorization boundary.**
 
 The first offer is a **six-week design-partner pilot** for small AI-native software teams already allowing coding agents to make or propose consequential changes. The pilot must place at least one real action behind a non-bypassable Ledgato enforcement path, measure whether unsafe or unauthorized actions are stopped without making normal work unusable, and end with a paid-continuation decision.
 
+The canonical first pilot path is documented in [`DESIGN_PARTNER_GITHUB_PILOT.md`](./DESIGN_PARTNER_GITHUB_PILOT.md): **coding agent → Ledgato gateway → protected GitHub action → downstream verification + signed evidence**.
+
 This is a validation-first investment. Do not expand the product, rename it, or market it as production-proven until the customer and technical gates in [`GO_TO_MARKET.md`](./GO_TO_MARKET.md) have been met. The recruiting plan, qualification rules, interview script, and outreach copy are in [`DESIGN_PARTNER_RECRUITING.md`](./DESIGN_PARTNER_RECRUITING.md).
+
+### Current readiness boundary
+
+- **Interview-ready:** yes. Discovery interviews do not require customer integration.
+- **Founder-led demo:** available, but demo/sample state must remain clearly distinguished from real enforcement evidence.
+- **External design-partner pilot:** not yet declared ready; the fresh-repository E2E gate in `DESIGN_PARTNER_GITHUB_PILOT.md` must pass first.
+- **Self-serve SaaS:** deliberately deferred until design-partner evidence determines what should be productized.
+
+## What has actually been proven
+
+The first real enforcement proof used GitHub. The protected credential was held by the Ledgato adapter, Ledgato received a request to perform `github.pull.merge`, policy returned `DENY`, the gateway did not call GitHub's merge endpoint, and a real GitHub readback confirmed the pull request remained unmerged. Signed evidence was produced for the decision.
+
+That supports this bounded claim:
+
+> **Ledgato can stop a governed agent/workflow from crossing a selected boundary when the protected credential is isolated behind the Ledgato gateway and the governed agent cannot bypass that gateway.**
+
+It does **not** establish that Ledgato sees every permission in an arbitrary stack, protects actions that bypass its enforcement path, or stops every exploit/escape/malicious behavior.
 
 ## Why
 
@@ -30,8 +49,8 @@ Ledgato/khrystal is intended to make that question enforceable and provable with
 
 ## What it does
 
-1. **Declare & map** — Represent the tools, data domains, endpoints, impact, and other authority an agent is intended to have, then compare that declaration with the surface it can reach.
-2. **Probe** — Run adversarial checks for scope escape, impact escalation, exfiltration, injection, and other boundary failures.
+1. **Declare & map** — Represent the tools, data domains, endpoints, impact, and other authority an agent is intended to have, then compare that declaration with the surface its configured integrations can observe.
+2. **Probe** — Run adversarial checks for scope escape, impact escalation, exfiltration, injection, and other boundary failures within the configured test surface.
 3. **Decide** — Resolve consequential boundary requests as **ALLOW / DENY / APPROVE** according to policy, task context, and evidence.
 4. **Enforce where integrated** — Feed the decision into the tool proxy, execution control plane, GitHub/CI gate, deployment path, or external system that can actually allow or block the action.
 5. **Attest** — Produce signed/tamper-evident evidence of what was tested, requested, decided, and authorized.
@@ -94,7 +113,9 @@ The same assurance engine should later be embeddable at other boundaries without
 
 ## Deployment and embedding
 
-Ledgato currently runs as a proxy layer or via a lightweight SDK shim — agents keep operating through their normal execution environment, with the assurance gate sitting between them and consequential tools/actions where integration allows.
+Ledgato currently runs as a proxy layer or via a lightweight SDK shim — agents keep operating through their normal execution environment, with the assurance gate sitting between them and selected consequential tools/actions where integration allows.
+
+For real enforcement, the protected credential must live with the gateway/adapter and must not also be available to the governed agent. Otherwise the agent can bypass the decision path and Ledgato is advisory rather than enforcing.
 
 The intended khrystal architecture is **independent engine, embedded experience**. Assurance can surface through:
 
@@ -107,6 +128,12 @@ The intended khrystal architecture is **independent engine, embedded experience*
 
 It can deploy in the user's infrastructure (VPC / on-prem) so scopes and sensitive evidence can remain inside the user's boundary.
 
+### Pilot persistence constraint
+
+The current API supports file-backed ledger, approval, authority, and signing-key state. A constrained single-process pilot must place these files on durable storage and pass restart testing. This should not be represented as multi-instance production persistence or concurrency safety.
+
+The approval/resume path is one-time: a consumed approval cannot be resumed again. General request-level idempotency for repeated direct `ALLOW` requests remains a design-partner readiness gap.
+
 ---
 
-This repository hosts the public landing page for Ledgato (`index.html`) and the working engine (`/engine/`).
+This repository hosts the public landing page for Ledgato (`index.html`) and the working engine (`/engine/`). The production Vercel experience must be reconciled separately before public claim changes are considered deployed.
