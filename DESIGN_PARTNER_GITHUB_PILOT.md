@@ -94,50 +94,61 @@ Compile that intent into the existing `Policy`/authority model; do not create a 
 
 ### 4. Start Ledgato with persistent state paths
 
-The HTTP API already supports file-backed state when explicit paths are supplied:
+The HTTP API supports file-backed state:
 
 - ledger: `ledger.jsonl` or an operator-chosen durable path;
 - delegated/JIT authority: `authority.json`;
 - approvals/resume state: `approvals.json`;
+- protected-execution idempotency: `idempotency.json`;
 - signing key directory: `keys/`.
 
 For the pilot, these paths must be on storage that survives process restart. Do not rely on ephemeral container filesystems.
 
+Every protected execution request should include a stable `idempotency_key` for that logical operation. A completed key returns its recorded result instead of calling the protected adapter again. Reusing the same key for a different request is rejected. If a previous attempt is left unresolved/PENDING after a crash, Ledgato fails closed and requires downstream-state verification rather than risking a second execution.
+
+This is intentionally a single-process pilot mechanism, not a distributed lock.
+
 ### 5. Run the DENY proof
 
-1. Agent requests the protected action through Ledgato.
+1. Agent requests the protected action through Ledgato with a stable `idempotency_key`.
 2. Policy resolves `DENY`.
 3. Confirm the adapter execution method was not invoked.
 4. Ledgato performs denial readback/verification.
 5. Verify GitHub shows the protected action did not occur.
 6. Preserve the signed evidence/attestation ID.
+7. Retry the identical request with the same key and confirm no new downstream execution occurs.
 
 Pass condition: the downstream provider confirms the action did not happen and evidence shows the gateway did not execute it.
 
 ### 6. Run the APPROVE → resume proof
 
-1. Agent requests an action whose policy resolves `APPROVE`.
-2. Ledgato creates a pending approval and does not execute downstream.
-3. Named human reviews exact action, task, repository/PR scope, and expiry.
-4. Human approves.
-5. Ledgato issues the bounded JIT grant if configured.
-6. The same pending action resumes using its one-time resume token.
-7. Ledgato executes the GitHub adapter exactly once.
-8. Post-action readback verifies the expected GitHub state.
-9. Preserve the signed evidence/attestation ID.
+1. Agent requests an action whose policy resolves `APPROVE`, with a stable `idempotency_key`.
+2. Ledgato creates one pending approval and does not execute downstream.
+3. Retrying the same initial request with the same key returns the same recorded approval result rather than creating another approval.
+4. Named human reviews exact action, task, repository/PR scope, and expiry.
+5. Human approves.
+6. Ledgato issues the bounded JIT grant if configured.
+7. The same pending action resumes using its one-time resume token.
+8. Ledgato executes the GitHub adapter exactly once.
+9. Post-action readback verifies the expected GitHub state.
+10. Preserve the signed evidence/attestation ID.
 
-The existing approval store marks a consumed approval `CONSUMED`, which prevents the same resume token from being reused. This protects the approval/resume path; it is **not yet a general idempotency guarantee for every direct `ALLOW` request**.
+The approval store marks a consumed approval `CONSUMED`, which prevents the same resume token from being reused.
 
 ### 7. Restart test
 
 Before declaring the pilot operational:
 
-1. create a pending approval;
+1. create a completed protected execution with an `idempotency_key`;
 2. restart the Ledgato service;
-3. confirm the pending approval still exists;
-4. confirm authority grants/revocations still exist;
-5. confirm ledger/evidence remains verifiable;
-6. complete or deny the pending action after restart.
+3. retry that same logical operation and confirm the recorded result is returned without another adapter execution;
+4. create a pending approval;
+5. restart again and confirm the pending approval still exists;
+6. confirm authority grants/revocations still exist;
+7. confirm ledger/evidence remains verifiable;
+8. complete or deny the pending action after restart.
+
+Also test an intentionally unresolved PENDING idempotency record: after restart, Ledgato must refuse to execute it again until an operator verifies downstream state.
 
 Failure of any item blocks design-partner readiness.
 
@@ -147,18 +158,20 @@ For the selected protected GitHub action:
 
 > If Ledgato cannot produce a valid authorization decision, the protected action does not proceed through the governed path.
 
-The coding agent must not treat timeout, connection failure, malformed response, missing policy, unknown grant, missing approval state, or unavailable gateway as permission to bypass Ledgato.
+The coding agent must not treat timeout, connection failure, malformed response, missing policy, unknown grant, missing approval state, unresolved idempotency state, or unavailable gateway as permission to bypass Ledgato.
 
 ### Recovery
 
-When the gateway is unavailable:
+When the gateway is unavailable or an operation is left in uncertain/PENDING state:
 
-1. stop/retry the protected action; do not fall back to direct provider credentials;
-2. notify the technical owner with task/action identity;
-3. restore the gateway and durable state;
-4. confirm policy, credential custody, grants/revocations, approvals, and ledger health;
-5. submit a **new** request unless an existing approval is durably present and valid;
-6. verify the downstream GitHub state before resuming normal automation.
+1. stop the protected action; do not fall back to direct provider credentials;
+2. notify the technical owner with task/action/idempotency identity;
+3. verify the downstream GitHub state before deciding whether another execution is safe;
+4. restore the gateway and durable state;
+5. confirm policy, credential custody, grants/revocations, approvals, idempotency records, and ledger health;
+6. reuse a completed key only to retrieve its prior result; do not mutate the request behind an old key;
+7. create a new operation key only after verifying the prior attempt did not already cross the boundary;
+8. verify the downstream GitHub state before resuming normal automation.
 
 Emergency manual intervention is an explicit human break-glass event and must be recorded separately; it is not evidence that Ledgato enforced the action.
 
@@ -169,6 +182,7 @@ For each proof run, retain:
 - partner/repository identifier;
 - agent/harness identifier;
 - task ID;
+- idempotency key;
 - requested action and target;
 - policy decision;
 - grant/approval identifiers where applicable;
@@ -188,21 +202,24 @@ A design-partner-ready result requires one fresh external workflow to complete t
 2. isolate the protected credential;
 3. prove the governed agent cannot bypass the gateway;
 4. define one boundary;
-5. request an unauthorized action;
+5. request an unauthorized action with a stable idempotency key;
 6. receive `DENY`;
 7. verify the action did not occur;
-8. request an approval-required legitimate action;
-9. approve with bounded authority;
-10. resume and execute exactly once;
-11. verify the action occurred;
-12. restart the service and confirm durable state/evidence;
-13. produce the evidence packet.
+8. retry and verify no downstream action occurs;
+9. request an approval-required legitimate action with a new stable idempotency key;
+10. retry the initial request and verify no duplicate approval is created;
+11. approve with bounded authority;
+12. resume and execute exactly once;
+13. verify the action occurred;
+14. restart the service and confirm durable approvals, authority, idempotency and evidence;
+15. retry the completed operation after restart and verify the adapter is not called again;
+16. produce the evidence packet.
 
 Until this passes outside the founder environment, status remains **design-partner candidate**, not externally production-proven.
 
 ## Known gaps this runbook does not hide
 
-- Direct `ALLOW` requests do not yet have a general request-level idempotency key/receipt cache in the gateway.
+- Persistent request-level idempotency is implemented on the Issue #51 branch but must pass CI and the real restart/external E2E tests before it is treated as proven.
 - File-backed JSON state is adequate for a tightly controlled single-process pilot only after restart testing; it is not a multi-instance concurrency design.
 - Credential storage/rotation is an operator deployment responsibility today, not a complete Ledgato secret-management product.
 - The public Vercel experience is not the canonical installation mechanism for this pilot.
