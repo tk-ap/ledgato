@@ -1,0 +1,12 @@
+{
+  "name": "ledgato-production-ui-recovery",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/recover-production-ui.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
