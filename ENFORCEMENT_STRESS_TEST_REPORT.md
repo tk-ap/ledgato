@@ -325,35 +325,129 @@ Then stages 3, 6, 7, 8 and 10 can run as written.
 
 ---
 
-## 11. Attempts, bypass matrix, provider evidence
+## 11. Stage 7 (partial) — deterministic bypass harness
 
-**None.** No live GitHub action of any kind has been performed under this
-directive. The credential-ownership table required before testing is not
-reproduced, because the architecture it describes has not been built.
+The provider-independent half of the attack suite has been built and run. It
+needs no GitHub credential. Every vector asserts on **whether the protected
+action actually reached the provider** (`adapter.merged`), not on the gateway's
+return value — a Ledgato-side error that left the action impossible is recorded
+as a reliability result, not a bypass.
+
+`engine/tests/test_bypass_harness.py` (17 vectors) + `test_resume_race.py`.
+
+### Approval abuse
+
+| Vector | Expected | Actual | Protected action occurred? |
+| --- | --- | --- | ---: |
+| Resume replay (same token twice) | refused | `ValueError`, 1 merge total | no |
+| Forged resume token | refused | `PermissionError` | no |
+| Resume before approval | refused | `ValueError` (not APPROVED) | no |
+| Resume after denial | refused | `ValueError` | no |
+| Mutate action via resume | impossible | resume reads stored action; no parameter exists to substitute a PR | no |
+| **Spend approval's JIT grant on a different PR (#99)** | refused | re-gated to `APPROVE`; PR 99 not merged | no |
+| Spend JIT grant on a different tool | refused | not ALLOW | no |
+| Expired JIT grant | denied | `DENY` | no |
+| Revoked grant, subsequent merge | denied | `DENY`; only pre-revocation merge present | no |
+| Concurrent duplicate resume (8 threads) | one merge | 1 merge, 7 errors; 50/50 runs clean | no |
+| **Concurrent duplicate resume (6+ OS processes)** | one merge | **2–3 merges — BYPASS** | **YES** |
+| Restart between approve and resume | one merge | 1 merge; re-resume refused | no |
+
+### Authority escalation
+
+| Vector | Expected | Actual | Protected action occurred? |
+| --- | --- | --- | ---: |
+| Merge with no grant when `require_grant` | denied | `DENY` | no |
+| Unknown agent executes | rejected | `KeyError` | no |
+| Tool outside policy | denied | `DENY` | no |
+| Agent issues/revokes own grants (API) | 403 | 403 | no |
+| Agent approves/denies own request (API) | 403 | 403 | no |
+| Agent acts as another agent (API) | 403 | 403 | no |
+| Approver drives agent execution (API) | 403 | 403 | no |
+
+### Failure behavior
+
+| Vector | Did Ledgato fail? | Action still impossible? | Bypass? |
+| --- | --- | --- | ---: |
+| Provider raises during execute | no — error surfaced | yes | no |
+| Provider readback verification fails | no — `verified: False` surfaced, not swallowed | n/a | no |
+| Corrupt approval store on load | yes — raises | yes | no |
+| Missing auth configuration | yes — refuses to start | yes | no |
 
 ---
 
-## 12. Outcome so far
+## 12. Bypass found and remediated
 
-**BLOCKED — not PASS, not FAIL.**
+### BYP-001 — approval replay via concurrent multi-process resume
 
-The PASS sentence defined in the handoff is deliberately not stated anywhere in
-this report, because zero protected-boundary attempts have been made and zero
-bypass routes have been tested.
+**Severity: high.** One human approval produced multiple real protected actions.
 
-Real defects found and fixed (two confirmed pre-existing security defects:
-fail-open authentication, and unbound caller-supplied identity). Those are
-genuine progress on the engineering-priority list (items 2, 3, 4), but they are
-*not* boundary verification and do not move `github_lab_merge` off `UNVERIFIED`.
+`ApprovalStore.consume()` validated `status` against the process's in-memory
+copy of file-backed state, then wrote `CONSUMED`. Each worker process held its
+own copy, so all observed `APPROVED`, all passed the check, and all executed —
+a time-of-check/time-of-use window with no cross-process locking.
 
-Unresolved limitations:
+Measured before fix: 6 processes → **2, 3, 2, 2, 3 merges** across 5 runs from a
+single approval.
 
-* file-backed stores are single-writer MVP state (handoff gap #5) — restart
-  behavior is covered by existing idempotency tests, concurrent-writer behavior
-  is not tested;
-* principal secrets are static bearer tokens with no rotation or expiry;
-* `/health` discloses policy and adapter names;
-* bubblewrap is same-UID rootless isolation, weaker than the preferred microVM;
-  it would need to be documented as a limitation even once the credential exists;
-* provider-level (GitHub-side) revocation remains untested and unclaimed
-  (handoff gap #4).
+The threaded version of this test passed **50/50**. The GIL hid the window.
+Thread-level concurrency testing is not adequate coverage for this bug class,
+which is why the regression test races OS processes.
+
+**Fix:** `consume()` performs its check-and-write under an exclusive advisory
+lock (`fcntl.flock` on a sidecar file) and re-reads state from disk inside the
+lock. Persistence switched to write-temp-then-rename.
+
+**Retested:** 16 processes × 15 runs → exactly one merge every run.
+Regression test: `engine/tests/test_resume_race.py`.
+
+**Process note:** this remediation was authored by the same agent that found the
+defect. Under the directive that disqualifies this agent from providing the
+final independent verification; it needs a distinct reviewer.
+
+---
+
+## 13. Test results
+
+```
+engine $ <venv>/bin/python -m pytest tests/ -q
+121 passed, 2 warnings
+```
+
+69 pre-existing (behavior unchanged) + 52 new. Commits `f3facc6`, `7ee3a40`,
+`312452b` on `proof/enforcement-stress-test`. Pushed; PR
+[tk-ap/ledgato#21](https://github.com/tk-ap/ledgato/pull/21).
+
+---
+
+## 14. Outstanding — requires the disposable lab
+
+Not run, because they need a real repo and a scoped Ledgato-held credential:
+
+* direct GitHub merge API with the agent's own credential
+* `git push` to protected `main`
+* `gh` CLI merge / auth reuse
+* cached token, `.git-credentials`, credential-helper reuse
+* equivalent environment token, alternate GitHub App/integration
+* credential leakage from the sandbox (env, mounted files, logs, errors, traces,
+  process inspection)
+* branch-protection / ruleset modification from the sandbox
+* workflow-credential escalation
+* live provider readback of denied and approved merges
+* Stage 10 autonomous-agent run
+
+---
+
+## 15. Outcome
+
+**BLOCKED — not PASS.**
+
+Boundary `github_lab_merge`: **`UNVERIFIED`**.
+
+Three real defects were found and fixed — two by source inspection
+(fail-open auth, unbound identity) and one by adversarial testing
+(BYP-001 approval replay). That is genuine progress against engineering
+priorities 2, 3, 4 and 8.
+
+It is **not** boundary verification. The entire direct-provider attack family is
+untested, so no claim about bypass resistance at the GitHub boundary is
+supportable. The handoff's PASS sentence is deliberately not stated.
