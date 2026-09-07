@@ -17,6 +17,12 @@ from . import attestation as attest_ops
 from .adapters.base import EnforcementAdapter
 from .adapters.github import GitHubAdapter
 from .approvals import ApprovalStore
+from .principals import (
+    IdentityClaimError,
+    Principal,
+    PrincipalRegistry,
+    enforce_claim,
+)
 from .authority import AuthorityStore
 from .crypto import Signer
 from .distributed import Node
@@ -67,7 +73,7 @@ class DiscoveryRequest(BaseModel):
 
 
 class GatewayRequest(BaseModel):
-    agent: str
+    agent: Optional[str] = None
     adapter: str
     action: ActionIn
     task_id: Optional[str] = None
@@ -78,7 +84,7 @@ class GatewayRequest(BaseModel):
 
 class GrantIssueRequest(BaseModel):
     agent: str
-    granted_by: str
+    granted_by: Optional[str] = None
     purpose: str
     tools: list[str] = Field(default_factory=list)
     data_domains: list[str] = Field(default_factory=list)
@@ -90,18 +96,19 @@ class GrantIssueRequest(BaseModel):
 
 
 class GrantRevokeRequest(BaseModel):
-    revoked_by: str
+    # Optional claim: if present it must match the authenticated principal.
+    revoked_by: Optional[str] = None
     reason: str
 
 
 class ApprovalDecisionRequest(BaseModel):
-    decided_by: str
+    decided_by: Optional[str] = None
     reason: Optional[str] = None
     jit_ttl_seconds: Optional[int] = 300
 
 
 class ApprovalDenyRequest(BaseModel):
-    decided_by: str
+    decided_by: Optional[str] = None
     reason: Optional[str] = None
 
 
@@ -131,6 +138,8 @@ def create_app(
     approvals_path: str | Path | None = "approvals.json",
     idempotency_path: str | Path | None = "idempotency.json",
     api_key: str | None = None,
+    principals: PrincipalRegistry | None = None,
+    require_auth: bool = True,
 ) -> FastAPI:
     config_path = Path(config_path)
     key_dir = Path(key_dir)
@@ -171,13 +180,48 @@ def create_app(
     app.state.adapters = registered_adapters
 
     configured_key = api_key or os.getenv("LEDGATO_API_KEY")
+    registry = principals if principals is not None else PrincipalRegistry.from_env()
+
+    # A shared key stays supported for single-tenant use, but it is mapped onto
+    # an explicit admin principal rather than bypassing identity entirely.
+    if configured_key and not registry.configured():
+        registry.add("shared-key", "admin", configured_key)
+
+    if require_auth and not registry.configured():
+        raise RuntimeError(
+            "Ledgato refuses to start unauthenticated: set LEDGATO_API_KEY or "
+            "LEDGATO_PRINCIPALS, or pass require_auth=False for an explicitly "
+            "unauthenticated local development instance."
+        )
+
+    app_requires_auth = registry.configured()
+
+    def _principal(authorization: str | None = Header(default=None)) -> Principal:
+        """Resolve the caller from its bearer credential. Fails closed."""
+        if not app_requires_auth:
+            return Principal(id="anonymous", role="admin")
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(401, "missing Ledgato credential")
+        found = registry.resolve(authorization[len("Bearer ") :])
+        if found is None:
+            raise HTTPException(401, "invalid Ledgato credential")
+        return found
 
     def _auth(authorization: str | None = Header(default=None)) -> None:
-        if not configured_key:
-            return
-        expected = f"Bearer {configured_key}"
-        if authorization != expected:
-            raise HTTPException(401, "invalid or missing Ledgato API key")
+        _principal(authorization)
+
+    def _require_role(principal: Principal, *, allowed: set[str], action: str) -> None:
+        if principal.role not in allowed:
+            raise HTTPException(
+                403,
+                f"principal '{principal.id}' with role '{principal.role}' may not {action}",
+            )
+
+    def _claim(principal: Principal, claimed: str | None, *, field: str) -> str:
+        try:
+            return enforce_claim(principal, claimed, field=field)
+        except IdentityClaimError as exc:
+            raise HTTPException(403, str(exc)) from exc
 
     def _policy(agent: str) -> Policy:
         pol = policies.get(agent)
@@ -237,16 +281,21 @@ def create_app(
         except Exception as exc:
             raise HTTPException(502, f"live discovery failed: {exc}") from exc
 
-    @app.post("/v1/gateway/execute", dependencies=[Depends(_auth)])
-    def gateway_execute(req: GatewayRequest):
+    @app.post("/v1/gateway/execute")
+    def gateway_execute(req: GatewayRequest, principal: Principal = Depends(_principal)):
+        # An agent principal may only ever act as itself. Approver/admin
+        # principals are not permitted to drive agent execution at all, so a
+        # human credential cannot be used to launder an agent action.
+        _require_role(principal, allowed={"agent"}, action="execute governed actions")
+        agent_id = _claim(principal, req.agent, field="agent")
         try:
             return gateway.execute(
-                agent=req.agent,
+                agent=agent_id,
                 adapter=req.adapter,
                 action=_action(req.action),
                 task_id=req.task_id,
                 grant_id=req.grant_id,
-                requested_by=req.requested_by,
+                requested_by=principal.id,
                 idempotency_key=req.idempotency_key,
             )
         except KeyError as exc:
@@ -256,10 +305,13 @@ def create_app(
         except Exception as exc:
             raise HTTPException(502, f"protected execution failed: {exc}") from exc
 
-    @app.post("/v1/authority/grants", dependencies=[Depends(_auth)])
-    def issue_grant(req: GrantIssueRequest):
+    @app.post("/v1/authority/grants")
+    def issue_grant(req: GrantIssueRequest, principal: Principal = Depends(_principal)):
+        _require_role(principal, allowed={"admin"}, action="issue authority grants")
+        payload = _model_dict(req)
+        payload["granted_by"] = _claim(principal, payload.get("granted_by"), field="granted_by")
         try:
-            grant = authority.issue(**_model_dict(req))
+            grant = authority.issue(**payload)
         except (KeyError, ValueError) as exc:
             raise HTTPException(409, str(exc)) from exc
         ledger.append(req.agent, "GRANTED", {"authority": grant.to_dict()}, action="authority.grant")
@@ -269,10 +321,14 @@ def create_app(
     def list_grants(agent: str | None = None, active_only: bool = False):
         return {"grants": [g.to_dict() for g in authority.list(agent=agent, active_only=active_only)]}
 
-    @app.post("/v1/authority/grants/{grant_id}/revoke", dependencies=[Depends(_auth)])
-    def revoke_grant(grant_id: str, req: GrantRevokeRequest):
+    @app.post("/v1/authority/grants/{grant_id}/revoke")
+    def revoke_grant(
+        grant_id: str, req: GrantRevokeRequest, principal: Principal = Depends(_principal)
+    ):
+        _require_role(principal, allowed={"admin"}, action="revoke authority grants")
+        revoked_by = _claim(principal, req.revoked_by, field="revoked_by")
         try:
-            grant = authority.revoke(grant_id, revoked_by=req.revoked_by, reason=req.reason)
+            grant = authority.revoke(grant_id, revoked_by=revoked_by, reason=req.reason)
         except KeyError as exc:
             raise HTTPException(404, f"unknown grant '{grant_id}'") from exc
         ledger.append(grant.agent, "REVOKED", {"authority": grant.to_dict()}, action="authority.revoke")
@@ -282,12 +338,20 @@ def create_app(
     def list_approvals(status: str | None = None):
         return {"approvals": [a.to_dict() for a in approvals.list(status=status)]}
 
-    @app.post("/v1/approvals/{approval_id}/approve", dependencies=[Depends(_auth)])
-    def approve(approval_id: str, req: ApprovalDecisionRequest):
+    @app.post("/v1/approvals/{approval_id}/approve")
+    def approve(
+        approval_id: str,
+        req: ApprovalDecisionRequest,
+        principal: Principal = Depends(_principal),
+    ):
+        # Separation of duties: the agent that requested the action can never
+        # be the principal that approves it.
+        _require_role(principal, allowed={"approver"}, action="decide approvals")
+        decided_by = _claim(principal, req.decided_by, field="decided_by")
         try:
             return gateway.approve(
                 approval_id,
-                decided_by=req.decided_by,
+                decided_by=decided_by,
                 reason=req.reason,
                 jit_ttl_seconds=req.jit_ttl_seconds,
             )
@@ -296,10 +360,14 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
 
-    @app.post("/v1/approvals/{approval_id}/deny", dependencies=[Depends(_auth)])
-    def deny_approval(approval_id: str, req: ApprovalDenyRequest):
+    @app.post("/v1/approvals/{approval_id}/deny")
+    def deny_approval(
+        approval_id: str, req: ApprovalDenyRequest, principal: Principal = Depends(_principal)
+    ):
+        _require_role(principal, allowed={"approver"}, action="decide approvals")
+        decided_by = _claim(principal, req.decided_by, field="decided_by")
         try:
-            return gateway.deny_approval(approval_id, decided_by=req.decided_by, reason=req.reason)
+            return gateway.deny_approval(approval_id, decided_by=decided_by, reason=req.reason)
         except KeyError as exc:
             raise HTTPException(404, f"unknown approval '{approval_id}'") from exc
         except ValueError as exc:
@@ -401,4 +469,14 @@ def _default_adapters_from_env() -> dict[str, EnforcementAdapter]:
     return adapters
 
 
-app = create_app()
+def __getattr__(name: str):
+    """Build the default ASGI app lazily.
+
+    ``uvicorn ledgato.api:app`` still resolves, and a server started without a
+    credential still refuses to boot. Building it eagerly at import time would
+    mean the fail-closed check fires on *any* import of this module, including
+    by tooling that never serves traffic.
+    """
+    if name == "app":
+        return create_app()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

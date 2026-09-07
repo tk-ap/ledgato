@@ -31,6 +31,7 @@ def client(tmp_path):
         authority_path=tmp_path / "authority.json",
         approvals_path=tmp_path / "approvals.json",
         adapters={},
+        require_auth=False,  # explicitly-unauthenticated local dev instance
     )
     return TestClient(app)
 
