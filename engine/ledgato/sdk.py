@@ -34,6 +34,7 @@ class LedgatoClient:
         task_id: str | None = None,
         grant_id: str | None = None,
         requested_by: str | None = None,
+        idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         return self._call(
             "POST",
@@ -44,6 +45,7 @@ class LedgatoClient:
                 "task_id": task_id,
                 "grant_id": grant_id,
                 "requested_by": requested_by,
+                "idempotency_key": idempotency_key,
                 "action": action,
             },
         )

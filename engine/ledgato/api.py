@@ -23,6 +23,7 @@ from .distributed import Node
 from .engine import DENY, Decision, evaluate_action
 from .gate import attest_release
 from .gateway import EnforcementGateway
+from .idempotency import IdempotencyStore
 from .ledger import Ledger
 from .models import Action, Policy, load_policies
 from .probes import run_probes, summarize
@@ -72,6 +73,7 @@ class GatewayRequest(BaseModel):
     task_id: Optional[str] = None
     grant_id: Optional[str] = None
     requested_by: Optional[str] = None
+    idempotency_key: Optional[str] = None
 
 
 class GrantIssueRequest(BaseModel):
@@ -127,6 +129,7 @@ def create_app(
     adapters: dict[str, EnforcementAdapter] | None = None,
     authority_path: str | Path | None = "authority.json",
     approvals_path: str | Path | None = "approvals.json",
+    idempotency_path: str | Path | None = "idempotency.json",
     api_key: str | None = None,
 ) -> FastAPI:
     config_path = Path(config_path)
@@ -149,6 +152,7 @@ def create_app(
 
     authority = AuthorityStore(authority_path)
     approvals = ApprovalStore(approvals_path)
+    idempotency = IdempotencyStore(idempotency_path)
     registered_adapters = adapters if adapters is not None else _default_adapters_from_env()
     gateway = EnforcementGateway(
         policies=policies,
@@ -156,12 +160,14 @@ def create_app(
         ledger=ledger,
         authority=authority,
         approvals=approvals,
+        idempotency=idempotency,
     )
 
     app = FastAPI(title="Ledgato", version="0.3.0")
     app.state.gateway = gateway
     app.state.authority = authority
     app.state.approvals = approvals
+    app.state.idempotency = idempotency
     app.state.adapters = registered_adapters
 
     configured_key = api_key or os.getenv("LEDGATO_API_KEY")
@@ -188,6 +194,7 @@ def create_app(
             "policies": sorted(policies),
             "adapters": sorted(registered_adapters),
             "ledger_entries": len(ledger.entries),
+            "idempotency_records": len(idempotency.list()),
         }
 
     @app.post("/v1/actions/check", dependencies=[Depends(_auth)])
@@ -240,6 +247,7 @@ def create_app(
                 task_id=req.task_id,
                 grant_id=req.grant_id,
                 requested_by=req.requested_by,
+                idempotency_key=req.idempotency_key,
             )
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc

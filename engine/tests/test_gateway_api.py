@@ -40,20 +40,26 @@ class FakeAdapter:
         return {"verified": True, "executed": False, "tool": action.tool}
 
 
-@pytest.fixture()
-def setup(tmp_path):
+def build_app(tmp_path, adapter):
     cfg = tmp_path / "fence.yaml"
-    cfg.write_text(FENCE)
-    adapter = FakeAdapter()
-    app = create_app(
+    if not cfg.exists():
+        cfg.write_text(FENCE)
+    return create_app(
         config_path=cfg,
         ledger_path=tmp_path / "ledger.jsonl",
         key_dir=tmp_path / "keys",
         authority_path=tmp_path / "authority.json",
         approvals_path=tmp_path / "approvals.json",
+        idempotency_path=tmp_path / "idempotency.json",
         adapters={"fake": adapter},
         api_key="test-key",
     )
+
+
+@pytest.fixture()
+def setup(tmp_path):
+    adapter = FakeAdapter()
+    app = build_app(tmp_path, adapter)
     return TestClient(app), adapter
 
 
@@ -148,3 +154,50 @@ def test_issue_and_revoke_jit_grant(setup):
     )
     assert revoked.status_code == 200
     assert revoked.json()["revoked_at"] is not None
+
+
+def test_gateway_api_replays_same_operation_without_second_execution(setup):
+    client, adapter = setup
+    payload = {
+        "agent": "ops-agent",
+        "adapter": "fake",
+        "task_id": "t-idem",
+        "idempotency_key": "merge-pr-123",
+        "action": {"tool": "fake.safe", "impact": "write"},
+    }
+
+    first = client.post("/v1/gateway/execute", headers=headers(), json=payload)
+    second = client.post("/v1/gateway/execute", headers=headers(), json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["idempotent_replay"] is False
+    assert second.json()["idempotent_replay"] is True
+    assert second.json()["idempotency_key"] == "merge-pr-123"
+    assert second.json()["attestation_id"] == first.json()["attestation_id"]
+    assert adapter.executions == ["fake.safe"]
+
+
+def test_gateway_api_idempotency_survives_service_recreation(tmp_path):
+    first_adapter = FakeAdapter()
+    first = TestClient(build_app(tmp_path, first_adapter))
+    payload = {
+        "agent": "ops-agent",
+        "adapter": "fake",
+        "task_id": "t-restart",
+        "idempotency_key": "operation-after-restart",
+        "action": {"tool": "fake.safe", "impact": "write"},
+    }
+
+    original = first.post("/v1/gateway/execute", headers=headers(), json=payload)
+    assert original.status_code == 200
+    assert first_adapter.executions == ["fake.safe"]
+
+    second_adapter = FakeAdapter()
+    second = TestClient(build_app(tmp_path, second_adapter))
+    replay = second.post("/v1/gateway/execute", headers=headers(), json=payload)
+
+    assert replay.status_code == 200
+    assert replay.json()["idempotent_replay"] is True
+    assert replay.json()["attestation_id"] == original.json()["attestation_id"]
+    assert second_adapter.executions == []
