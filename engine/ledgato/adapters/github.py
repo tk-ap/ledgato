@@ -16,11 +16,13 @@ from ..models import Action
 class GitHubAdapter:
     name = "github"
     API = "https://api.github.com"
+    is_live_provider = True
 
     def __init__(self, *, repository: str, token: str, api_url: str | None = None):
         if "/" not in repository:
             raise ValueError("repository must be owner/name")
         self.repository = repository
+        self.boundary_resource = repository
         self.token = token
         self.api_url = (api_url or self.API).rstrip("/")
 

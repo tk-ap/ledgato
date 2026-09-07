@@ -9,6 +9,7 @@ from typing import Any
 
 from .adapters.base import EnforcementAdapter, ExecutionReceipt
 from .approvals import APPROVED, ApprovalStore
+from .boundary import BoundaryStore
 from .authority import AuthorityStore
 from .engine import ALLOW, APPROVE, DENY, Decision, detect_drift, evaluate_action
 from .idempotency import IdempotencyStore
@@ -26,6 +27,7 @@ class EnforcementGateway:
         authority: AuthorityStore | None = None,
         approvals: ApprovalStore | None = None,
         idempotency: IdempotencyStore | None = None,
+        boundaries: BoundaryStore | None = None,
     ):
         self.policies = policies
         self.adapters = adapters
@@ -33,6 +35,10 @@ class EnforcementGateway:
         self.authority = authority or AuthorityStore()
         self.approvals = approvals or ApprovalStore()
         self.idempotency = idempotency or IdempotencyStore()
+        #: Optional. When present, decisions are filed as boundary evidence.
+        #: Boundaries are never auto-created — an unregistered target is simply
+        #: not tracked, so this cannot drift into an asset inventory.
+        self.boundaries = boundaries
 
     def discover(self, *, agent: str, adapter: str) -> dict[str, Any]:
         pol = self._policy(agent)
@@ -121,6 +127,10 @@ class EnforcementGateway:
                 "boundary_crossed": False,
             }
             entry = self.ledger.append(agent, APPROVE, evidence, action=action.tool)
+            self._file_boundary_evidence(
+                target=target, action=action, status=APPROVE, executed=False,
+                ledger_entry_id=entry.id,
+            )
             result = {
                 "status": APPROVE,
                 "executed": False,
@@ -263,6 +273,57 @@ class EnforcementGateway:
         )
         return grant, decision
 
+    def _file_boundary_evidence(
+        self,
+        *,
+        target: EnforcementAdapter,
+        action: Action,
+        status: str,
+        executed: bool,
+        ledger_entry_id: str | None,
+        verification: dict[str, Any] | None = None,
+    ) -> None:
+        """Record a decision against a registered EnforcementBoundary.
+
+        Deliberately does nothing unless a boundary was explicitly registered
+        for this provider/resource/action. ``record_decision`` cannot change
+        ``bypass_status``: answering DENY shows the gateway evaluated policy,
+        not that no other route to the action exists.
+
+        A provider readback is filed separately, and only for adapters that
+        declare ``is_live_provider``. Without that guard an in-process test
+        double would emit the very evidence the VERIFIED gate demands.
+        """
+        if self.boundaries is None:
+            return
+        resource = getattr(target, "boundary_resource", None)
+        if not resource:
+            return
+        boundary = self.boundaries.find(
+            provider=target.name, resource=resource, action=action.tool
+        )
+        if boundary is None:
+            return
+
+        self.boundaries.record_decision(
+            boundary.id,
+            status=status,
+            executed=executed,
+            ledger_entry_id=ledger_entry_id,
+            detail={"action": action.to_dict()},
+        )
+
+        if verification is not None and getattr(target, "is_live_provider", False):
+            self.boundaries.record_evidence(
+                boundary.id,
+                kind="provider_readback",
+                summary=f"provider readback after {status}",
+                outcome="verified" if verification.get("verified") else "unverified",
+                protected_action_occurred=executed,
+                ledger_entry_id=ledger_entry_id,
+                detail=verification,
+            )
+
     def _record_denial(
         self,
         *,
@@ -281,6 +342,10 @@ class EnforcementGateway:
             "verification": denial_verification,
         }
         entry = self.ledger.append(agent, DENY, final_evidence, action=action.tool)
+        self._file_boundary_evidence(
+            target=target, action=action, status=DENY, executed=False,
+            ledger_entry_id=entry.id, verification=denial_verification,
+        )
         return {
             "status": DENY,
             "executed": False,
@@ -320,6 +385,10 @@ class EnforcementGateway:
             "verification": verification,
         }
         entry = self.ledger.append(agent, ALLOW, evidence, action=action.tool)
+        self._file_boundary_evidence(
+            target=target, action=action, status=ALLOW, executed=bool(receipt.executed),
+            ledger_entry_id=entry.id, verification=verification,
+        )
         return {
             "status": ALLOW,
             "executed": receipt.executed,

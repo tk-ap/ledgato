@@ -30,6 +30,16 @@ class EnforcementAdapter(Protocol):
 
     name: str
 
+    #: True only for adapters that talk to a real external provider. Evidence
+    #: recorded against a boundary is only treated as provider-backed when this
+    #: is set, so in-process test doubles can never satisfy a VERIFIED claim.
+    is_live_provider: bool = False
+
+    #: Identifies the concrete resource this adapter is bound to (e.g. the
+    #: GitHub repository), used to match an EnforcementBoundary. None when the
+    #: adapter is not scoped to a single resource.
+    boundary_resource: str | None = None
+
     def discover(self, agent: str) -> set[str]:
         """Return capabilities currently reachable through this adapter."""
 
