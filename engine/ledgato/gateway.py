@@ -60,6 +60,18 @@ class EnforcementGateway:
         requested_by: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
+        # Validate all deterministic local prerequisites before reserving the
+        # operation key. Configuration mistakes must not poison a key as an
+        # "uncertain execution" when no downstream action could have happened.
+        pol = self._policy(agent)
+        target = self._adapter(adapter)
+        grant, decision = self._decide(
+            policy=pol,
+            action=action,
+            task_id=task_id,
+            grant_id=grant_id,
+        )
+
         request_record = {
             "agent": agent,
             "adapter": adapter,
@@ -72,15 +84,6 @@ class EnforcementGateway:
             cached = self.idempotency.begin(idempotency_key, request_record)
             if cached is not None:
                 return {**cached, "idempotent_replay": True}
-
-        pol = self._policy(agent)
-        target = self._adapter(adapter)
-        grant, decision = self._decide(
-            policy=pol,
-            action=action,
-            task_id=task_id,
-            grant_id=grant_id,
-        )
 
         base_evidence = {
             "task_id": task_id,
@@ -332,8 +335,12 @@ class EnforcementGateway:
     ) -> dict[str, Any]:
         if not idempotency_key:
             return result
-        completed = self.idempotency.complete(idempotency_key, result)
-        return {**completed, "idempotency_key": idempotency_key, "idempotent_replay": False}
+        normalized = {
+            **result,
+            "idempotency_key": idempotency_key,
+            "idempotent_replay": False,
+        }
+        return self.idempotency.complete(idempotency_key, normalized)
 
     def _policy(self, agent: str) -> Policy:
         pol = self.policies.get(agent)
