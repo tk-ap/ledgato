@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "node scripts/recover-production-ui.mjs"
+    "build": "node scripts/recover-production-ui.mjs && node scripts/patch-recovered-html.mjs"
   },
   "engines": {
     "node": ">=20"
