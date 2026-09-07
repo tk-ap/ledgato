@@ -23,3 +23,13 @@ ledgato = "ledgato.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["ledgato*"]
+
+[tool.pytest.ini_options]
+# Tiering is ENFORCED in tests/conftest.py, not here: CI invokes pytest from the
+# repository root, where this file may not be selected as the config source. A
+# marker expression left only in this section could silently stop applying and
+# let live-provider tests run against a real repository.
+markers = [
+    "live: needs a real provider credential; opt-in via LEDGATO_LIVE_TESTS=1",
+    "sandbox: needs bubblewrap (bwrap) on the host",
+]
