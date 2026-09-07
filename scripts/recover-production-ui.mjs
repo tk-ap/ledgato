@@ -102,11 +102,14 @@ const replacements = [
   ],
 ];
 
+// These are the exact source strings whose absence would mean the immutable
+// production artifact changed and this surgical patch should stop rather than
+// silently publish inaccurate copy.
 const requiredNeedles = [
   "LIVE · ENFORCING POLICY",
   "If an agent shouldn't be able to do it, Ledgato stops it.",
-  "If it can reach your stack, Ledgato can see it.",
-  "Anything that escapes, drifts, or exfiltrates is caught and blocked before release.",
+  "Wire up every agent, tool, API and identity. If it can reach your stack, Ledgato can see it.",
+  "Adversarial and regression probes attack the declared scope. Anything that escapes, drifts, or exfiltrates is caught and blocked before release.",
   "● LIVE · ENFORCING",
   "#1837 — it tried to escape.",
 ];
