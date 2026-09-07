@@ -2,6 +2,8 @@
 
 > Status: product-direction scope corrected; public rename not yet implemented.
 
+> **Commercial sequencing:** the broad Agent Assurance direction does not authorize a broad initial build. The current entry wedge, customer profile, six-week pilot, evidence gates, and stop conditions are defined in [`GO_TO_MARKET.md`](./GO_TO_MARKET.md). Recruiting must follow [`DESIGN_PARTNER_RECRUITING.md`](./DESIGN_PARTNER_RECRUITING.md).
+
 ## Working brand and category direction
 
 **khrystal — Agent Assurance**
