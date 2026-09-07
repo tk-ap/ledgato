@@ -103,7 +103,7 @@ def test_cannot_verify_while_a_bypass_succeeded(lab):
         outcome="merge succeeded",
         protected_action_occurred=True,
     )
-    with pytest.raises(ValueError, match="reached the protected action"):
+    with pytest.raises(ValueError, match="lack remediation"):
         lab.set_status(
             "github_lab_merge",
             "VERIFIED",
@@ -211,3 +211,94 @@ def test_state_survives_restart(tmp_path):
 def test_unknown_boundary_raises(store):
     with pytest.raises(KeyError, match="unknown boundary"):
         store.get("nope")
+
+
+# --- remediation lifecycle (review blocker #2) ----------------------------
+
+def test_remediated_and_retested_boundary_can_reach_verified(lab):
+    """BYPASS_FOUND -> remediation -> clean retest -> VERIFIED must be possible.
+
+    Previously `set_status` gated on all historical breaches, so any boundary
+    that had ever been breached could never be verified again, no matter what
+    was fixed or retested.
+    """
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt",
+        summary="concurrent multi-process resume", outcome="merged twice",
+        protected_action_occurred=True,
+    )
+    assert lab.get("github_lab_merge").bypass_status == "BYPASS_FOUND"
+
+    lab.record_evidence(
+        "github_lab_merge", kind="remediation",
+        summary="consume() now locks and re-reads", outcome="fixed",
+    )
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt",
+        summary="16 processes x 15 runs", outcome="exactly one merge",
+        protected_action_occurred=False,
+    )
+
+    boundary = lab.set_status(
+        "github_lab_merge", "VERIFIED",
+        attested_by="independent-reviewer",
+        justification="remediated and retested clean",
+    )
+    assert boundary.bypass_status == "VERIFIED"
+
+
+def test_historical_breach_is_never_erased(lab):
+    """Verification must not launder the record."""
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt", summary="race",
+        outcome="merged twice", protected_action_occurred=True,
+    )
+    lab.record_evidence("github_lab_merge", kind="remediation", summary="fix", outcome="fixed")
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt", summary="retest",
+        outcome="rejected", protected_action_occurred=False,
+    )
+    lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="j")
+
+    boundary = lab.get("github_lab_merge")
+    assert len(boundary.successful_bypasses()) == 1      # history intact
+    assert boundary.unresolved_bypasses() == []          # but closed out
+
+
+def test_remediation_without_retest_does_not_permit_verified(lab):
+    """A fix nobody re-attacked is a claim, not evidence."""
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt", summary="race",
+        outcome="merged", protected_action_occurred=True,
+    )
+    lab.record_evidence("github_lab_merge", kind="remediation", summary="fix", outcome="fixed")
+    with pytest.raises(ValueError, match="clean adversarial retest"):
+        lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="trust me")
+
+
+def test_retest_before_remediation_does_not_count(lab):
+    """Ordering matters: a clean run recorded before the fix proves nothing."""
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt", summary="clean early run",
+        outcome="rejected", protected_action_occurred=False,
+    )
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt", summary="race",
+        outcome="merged", protected_action_occurred=True,
+    )
+    lab.record_evidence("github_lab_merge", kind="remediation", summary="fix", outcome="fixed")
+    with pytest.raises(ValueError, match="clean adversarial retest"):
+        lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="j")
+
+
+def test_new_breach_after_verification_relatches(lab):
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt", summary="probe",
+        outcome="rejected", protected_action_occurred=False,
+    )
+    lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="j")
+    lab.record_evidence(
+        "github_lab_merge", kind="bypass_attempt", summary="new vector",
+        outcome="merged", protected_action_occurred=True,
+    )
+    assert lab.get("github_lab_merge").bypass_status == "BYPASS_FOUND"

@@ -50,9 +50,6 @@ class Approval:
 
 
 class ApprovalStore:
-    #: Guards read-modify-write sequences within a single process.
-    _thread_lock = threading.Lock()
-
     @contextmanager
     def _exclusive(self):
         """Serialize a read-modify-write across threads *and* processes.
@@ -82,6 +79,10 @@ class ApprovalStore:
                     os.close(fd)
 
     def __init__(self, path: str | Path | None = None):
+        # Per-instance and reentrant: a class-level lock would serialize
+        # unrelated stores, and a plain Lock would deadlock if a guarded
+        # method ever called another.
+        self._thread_lock = threading.RLock()
         self.path = Path(path) if path else None
         self._items: dict[str, Approval] = {}
         self._load()
@@ -106,29 +107,42 @@ class ApprovalStore:
             requested_at=utcnow().isoformat(),
             requested_by=requested_by,
         )
-        self._items[approval.id] = approval
-        self._save()
+        # _save() rewrites the whole file from this process's snapshot, so the
+        # insert must happen against freshly-read state or concurrent requests
+        # silently drop each other.
+        with self._exclusive():
+            self._items[approval.id] = approval
+            self._save()
         return approval
 
     def get(self, approval_id: str) -> Approval | None:
         return self._items.get(approval_id)
 
     def decide(self, approval_id: str, *, approved: bool, decided_by: str, reason: str | None = None) -> Approval:
-        item = self._require(approval_id)
-        if item.status != PENDING:
-            raise ValueError(f"approval is already {item.status}")
-        item.status = APPROVED if approved else DENIED
-        item.decided_at = utcnow().isoformat()
-        item.decided_by = decided_by
-        item.decision_reason = reason
-        self._save()
-        return item
+        """Record the one and only decision on an approval.
+
+        The PENDING guard is only meaningful when evaluated against current
+        state: without the lock two workers each saw PENDING, both succeeded,
+        and last-writer-won — so a human denial could be silently replaced by
+        an approval.
+        """
+        with self._exclusive():
+            item = self._require(approval_id)
+            if item.status != PENDING:
+                raise ValueError(f"approval is already {item.status}")
+            item.status = APPROVED if approved else DENIED
+            item.decided_at = utcnow().isoformat()
+            item.decided_by = decided_by
+            item.decision_reason = reason
+            self._save()
+            return item
 
     def attach_jit_grant(self, approval_id: str, grant_id: str) -> Approval:
-        item = self._require(approval_id)
-        item.jit_grant_id = grant_id
-        self._save()
-        return item
+        with self._exclusive():
+            item = self._require(approval_id)
+            item.jit_grant_id = grant_id
+            self._save()
+            return item
 
     def consume(self, approval_id: str, resume_token: str) -> Approval:
         """Claim an approval exactly once.

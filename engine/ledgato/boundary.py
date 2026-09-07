@@ -97,13 +97,54 @@ class EnforcementBoundary:
         return [e for e in self.verification_evidence if e.kind in BYPASS_EVIDENCE_KINDS]
 
     def successful_bypasses(self) -> list[BoundaryEvidence]:
-        """Attempts where the protected downstream action actually happened.
+        """Every attempt where the protected action actually happened.
 
-        This is the only signal that constitutes a security-boundary failure.
+        This is the permanent historical record and is never pruned: a boundary
+        that was once breached should always be able to show it. Use
+        :meth:`unresolved_bypasses` to gate status, not this.
+
         A Ledgato-side error that left the action impossible is a reliability
-        bug, not a bypass.
+        bug, not a bypass, and does not appear here.
         """
         return [e for e in self.bypass_attempts() if e.protected_action_occurred is True]
+
+    def unresolved_bypasses(self) -> list[BoundaryEvidence]:
+        """Breaches not yet closed out by remediation *and* a clean retest.
+
+        A breach is resolved when the evidence timeline shows, in order:
+
+        1. the breach;
+        2. a ``remediation`` entry recorded after it;
+        3. at least one adversarial attempt after that remediation which did
+           **not** reach the protected action.
+
+        Remediation alone is not enough — a fix nobody re-attacked is a claim,
+        not evidence. Evidence order is the timeline; entries are append-only.
+        """
+        evidence = self.verification_evidence
+        unresolved: list[BoundaryEvidence] = []
+
+        for index, item in enumerate(evidence):
+            if item.kind not in BYPASS_EVIDENCE_KINDS or item.protected_action_occurred is not True:
+                continue
+
+            remediation_at = next(
+                (j for j in range(index + 1, len(evidence)) if evidence[j].kind == "remediation"),
+                None,
+            )
+            if remediation_at is None:
+                unresolved.append(item)
+                continue
+
+            retested_clean = any(
+                evidence[j].kind in BYPASS_EVIDENCE_KINDS
+                and evidence[j].protected_action_occurred is False
+                for j in range(remediation_at + 1, len(evidence))
+            )
+            if not retested_clean:
+                unresolved.append(item)
+
+        return unresolved
 
 
 class BoundaryStore:
@@ -278,11 +319,14 @@ class BoundaryStore:
                     "cannot mark VERIFIED: no bypass/leakage/escalation attempts recorded. "
                     "Policy decisions alone are not bypass-resistance evidence."
                 )
-            breached = boundary.successful_bypasses()
-            if breached:
+            # Gate on *unresolved* breaches, not on history. A boundary that was
+            # breached, remediated and cleanly retested must be able to advance;
+            # the breach itself stays in the record permanently.
+            unresolved = boundary.unresolved_bypasses()
+            if unresolved:
                 raise ValueError(
-                    f"cannot mark VERIFIED: {len(breached)} recorded attempt(s) reached the "
-                    "protected action; remediate and retest first"
+                    f"cannot mark VERIFIED: {len(unresolved)} recorded breach(es) lack "
+                    "remediation followed by a clean adversarial retest"
                 )
 
         if boundary.bypass_status == "BYPASS_FOUND" and status != "BYPASS_FOUND":

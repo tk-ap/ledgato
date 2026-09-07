@@ -99,3 +99,100 @@ def test_concurrent_resume_across_processes_merges_exactly_once(tmp_path):
         f"one approval produced {len(merges)} protected actions: {merges} "
         "— approval replay bypass has regressed"
     )
+
+
+# =====================================================================
+# Review blocker #1 — every file-backed mutation, not just consume()
+# =====================================================================
+
+def _decide_worker(tmp, approval_id, approved, barrier, out):
+    from ledgato.approvals import ApprovalStore
+    store = ApprovalStore(pathlib.Path(tmp) / "approvals.json")
+    barrier.wait()
+    try:
+        store.decide(
+            approval_id, approved=approved,
+            decided_by="approver" if approved else "security", reason="race",
+        )
+        out.append("APPROVED" if approved else "DENIED")
+    except Exception as exc:
+        out.append(f"rejected:{type(exc).__name__}")
+
+
+def _request_worker(tmp, index, barrier, out):
+    from ledgato.approvals import ApprovalStore
+    store = ApprovalStore(pathlib.Path(tmp) / "approvals.json")
+    barrier.wait()
+    item = store.request(
+        agent="lab-agent", adapter="github",
+        action={"tool": "github.pull.merge", "impact": "destructive",
+                "params": {"pull_number": index}, "domain": None, "intent": None},
+        task_id=f"task-{index}", grant_id=None, requested_by="agent",
+    )
+    out.append(item.id)
+
+
+def _new_approval(tmp_path, pr=1):
+    from ledgato.approvals import ApprovalStore
+    store = ApprovalStore(tmp_path / "approvals.json")
+    return store.request(
+        agent="lab-agent", adapter="github",
+        action={"tool": "github.pull.merge", "impact": "destructive",
+                "params": {"pull_number": pr}, "domain": None, "intent": None},
+        task_id="t", grant_id=None, requested_by="agent",
+    )
+
+
+def test_concurrent_approve_and_deny_yields_exactly_one_decision(tmp_path):
+    """A human denial must not be silently overwritten by an approval.
+
+    Unguarded, both calls succeeded against stale snapshots and the final
+    status was last-writer-wins.
+    """
+    from ledgato.approvals import ApprovalStore
+
+    approval = _new_approval(tmp_path)
+    with mp.Manager() as mgr:
+        out = mgr.list()
+        barrier = mgr.Barrier(2)
+        procs = [
+            mp.Process(target=_decide_worker,
+                       args=(str(tmp_path), approval.id, True, barrier, out)),
+            mp.Process(target=_decide_worker,
+                       args=(str(tmp_path), approval.id, False, barrier, out)),
+        ]
+        for p in procs:
+            p.start()
+        for p in procs:
+            p.join(timeout=30)
+        calls = list(out)
+
+    accepted = [c for c in calls if not c.startswith("rejected")]
+    assert len(accepted) == 1, f"both decisions were accepted: {calls}"
+
+    final = ApprovalStore(tmp_path / "approvals.json").get(approval.id).status
+    assert final == ("APPROVED" if accepted[0] == "APPROVED" else "DENIED")
+
+
+def test_concurrent_requests_do_not_clobber_each_other(tmp_path):
+    """Each process rewrites the whole file; all approvals must survive."""
+    from ledgato.approvals import ApprovalStore
+
+    count = 12
+    with mp.Manager() as mgr:
+        out = mgr.list()
+        barrier = mgr.Barrier(count)
+        procs = [
+            mp.Process(target=_request_worker, args=(str(tmp_path), i, barrier, out))
+            for i in range(count)
+        ]
+        for p in procs:
+            p.start()
+        for p in procs:
+            p.join(timeout=30)
+        created = set(out)
+
+    assert len(created) == count
+    persisted = {a.id for a in ApprovalStore(tmp_path / "approvals.json").list()}
+    missing = created - persisted
+    assert not missing, f"{len(missing)} of {count} approvals were lost to clobbering"
