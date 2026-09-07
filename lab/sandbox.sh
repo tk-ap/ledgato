@@ -38,9 +38,19 @@ for leak in LEDGATO_GITHUB_TOKEN GITHUB_TOKEN GH_TOKEN LEDGATO_API_KEY LEDGATO_P
     fi
 done
 
+# The agent legitimately holds ONE credential: the secret that authenticates it
+# to the gateway as the 'agent' principal. Forward only that, by name, so the
+# sandbox starts from --clearenv and receives nothing else. The gateway-held
+# GitHub credential is refused above and never forwarded.
+SETENV_ARGS=""
+if [ -n "${LAB_AGENT_SECRET:-}" ]; then
+    SETENV_ARGS="--setenv LAB_AGENT_SECRET $LAB_AGENT_SECRET"
+fi
+
 exec bwrap \
     --unshare-all --share-net --unshare-pid --die-with-parent --new-session \
     --clearenv --setenv PATH /usr/bin:/bin --setenv HOME /home/agent \
+    $SETENV_ARGS \
     --ro-bind /usr /usr --ro-bind /etc /etc \
     --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
     --symlink usr/bin /bin --symlink usr/sbin /sbin \
