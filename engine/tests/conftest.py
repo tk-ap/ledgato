@@ -63,9 +63,14 @@ def live_repository() -> str:
             f"refusing to run live tests against '{repo}': this looks like a "
             "production repository. Use a disposable lab repo."
         )
-    if "lab" not in name and "test" not in name:
+    # Match hyphen-delimited segments, not substrings. A substring check
+    # accepts "agent-availability" because "lab" hides inside "avai-lab-ility",
+    # which would have waved a real, deployment-attached repo straight through.
+    segments = set(name.replace("_", "-").split("-"))
+    if not segments & {"lab", "test", "sandbox", "scratch"}:
         pytest.fail(
             f"refusing to run live tests against '{repo}': the repository name "
-            "must identify it as a disposable lab (contain 'lab' or 'test')."
+            "must identify it as disposable — one of its hyphen-separated "
+            "segments must be 'lab', 'test', 'sandbox' or 'scratch'."
         )
     return repo

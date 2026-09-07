@@ -71,3 +71,34 @@ def test_scanner_would_catch_a_real_token():
     """Guard the guard: a scanner that matches nothing passes vacuously."""
     fake = "ghp_" + "A" * 36
     assert PATTERNS["github personal access token"].findall(fake) == [fake]
+
+
+# --- the lab-repo guard itself --------------------------------------------
+
+def _guard_accepts(repo_name: str) -> bool:
+    """Mirror of conftest.live_repository's disposability check."""
+    name = repo_name.split("/")[-1].lower()
+    if name in ("ledgato", "ailhat", "alvira", "agent-os", "ashwood"):
+        return False
+    segments = set(name.replace("_", "-").split("-"))
+    return bool(segments & {"lab", "test", "sandbox", "scratch"})
+
+
+@pytest.mark.parametrize("repo", [
+    "tk-ap/agent-availability",   # 'lab' hides inside 'availability'
+    "tk-ap/collaboration-tools",  # and inside 'collaboration'
+    "tk-ap/ledgato",
+    "tk-ap/ailhat",
+    "tk-ap/ashwood-info",
+])
+def test_guard_rejects_non_disposable_repositories(repo):
+    assert not _guard_accepts(repo), f"guard would have accepted {repo}"
+
+
+@pytest.mark.parametrize("repo", [
+    "tk-ap/ledgato-enforcement-lab",
+    "tk-ap/ledgato-test",
+    "tk-ap/enforcement-sandbox",
+])
+def test_guard_accepts_genuinely_disposable_repositories(repo):
+    assert _guard_accepts(repo)
