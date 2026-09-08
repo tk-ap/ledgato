@@ -52,6 +52,7 @@ exec bwrap \
     --clearenv --setenv PATH /usr/bin:/bin --setenv HOME /home/agent \
     $SETENV_ARGS \
     --ro-bind /usr /usr --ro-bind /etc /etc \
+    --ro-bind-try /run/systemd/resolve /run/systemd/resolve \
     --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
     --symlink usr/bin /bin --symlink usr/sbin /sbin \
     --proc /proc --dev /dev --tmpfs /tmp --tmpfs /home --dir /home/agent \
