@@ -82,7 +82,15 @@ def evaluate_action(
         reasons.append(f"tool '{action.tool}' is on deny list")
         return _decision(DENY, "DENY: tool explicitly denied", reasons, policy, grant)
 
-    if policy.allow_tools and action.tool not in policy.allow_tools:
+    if not policy.allow_tools:
+        # F-1 fail-closed: an empty allowlist permits nothing. Previously
+        # `if policy.allow_tools and ...` skipped the check on an empty set,
+        # so a typo'd key (e.g. `allow_tools:` before plural parsing existed)
+        # silently permitted EVERY tool up to impact_max.
+        reasons.append("policy declares no allow_tools: deny-all (fail closed)")
+        return _decision(DENY, "DENY: no tools allowed by policy", reasons, policy, grant)
+
+    if action.tool not in policy.allow_tools:
         reasons.append(f"tool '{action.tool}' not in allow_tools {sorted(policy.allow_tools)}")
         return _decision(DENY, "DENY: tool out of scope", reasons, policy, grant)
 

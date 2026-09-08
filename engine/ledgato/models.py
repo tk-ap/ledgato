@@ -123,10 +123,25 @@ class Policy:
         }
 
 
+def _allow_tools_from(data: dict[str, Any]) -> set[str]:
+    """Merge singular ``allow_tool`` and plural ``allow_tools`` keys.
+
+    Both spellings are accepted (F-1: the plural key used to be silently
+    ignored, parsing to an empty allowlist). When both keys are present the
+    INTERSECTION wins — the stricter of the two declarations — so a stray
+    extra key can only narrow authority, never widen it.
+    """
+    singular = _as_set(data.get("allow_tool"))
+    plural = _as_set(data.get("allow_tools"))
+    if singular and plural:
+        return singular & plural
+    return singular | plural
+
+
 def parse_policy(data: dict[str, Any]) -> Policy:
     return Policy(
         agent=data.get("agent", "agent"),
-        allow_tools=_as_set(data.get("allow_tool")),
+        allow_tools=_allow_tools_from(data),
         deny_tools=_as_set(data.get("deny_tool")),
         impact_max=data.get("impact_max", "readonly"),
         data_domains=_as_list(data.get("data_domains")),
