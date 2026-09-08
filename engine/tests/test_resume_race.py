@@ -9,6 +9,7 @@ approval; the equivalent threaded test passed, because the GIL hid the window.
 Threads alone are therefore not sufficient coverage for this class of bug.
 """
 import multiprocessing as mp
+import pytest
 import pathlib
 
 from ledgato.adapters.base import ExecutionReceipt
@@ -196,3 +197,93 @@ def test_concurrent_requests_do_not_clobber_each_other(tmp_path):
     persisted = {a.id for a in ApprovalStore(tmp_path / "approvals.json").list()}
     missing = created - persisted
     assert not missing, f"{len(missing)} of {count} approvals were lost to clobbering"
+
+
+# =====================================================================
+# Codex blocker #1 — parent-revoke vs child-issue TOCTOU (AuthorityStore)
+# =====================================================================
+
+def _issue_child_worker(tmp, parent_id, barrier, out):
+    from ledgato.authority import AuthorityStore
+    store = AuthorityStore(pathlib.Path(tmp) / "authority.json")
+    barrier.wait()
+    try:
+        g = store.issue(agent="lab-agent", granted_by="ops", purpose="child",
+                        tools={"github.pull.merge"}, impact_max="destructive",
+                        task_id="t", parent_grant_id=parent_id, ttl_seconds=300)
+        out.append(("issued", g.id))
+    except Exception as exc:
+        out.append(("rejected", type(exc).__name__))
+
+
+def _revoke_parent_worker(tmp, parent_id, barrier, out):
+    from ledgato.authority import AuthorityStore
+    store = AuthorityStore(pathlib.Path(tmp) / "authority.json")
+    barrier.wait()
+    try:
+        store.revoke(parent_id, revoked_by="ops", reason="race")
+        out.append(("revoked", parent_id))
+    except Exception as exc:
+        out.append(("revoke-failed", type(exc).__name__))
+
+
+def test_no_child_is_committed_after_its_parent_was_revoked(tmp_path):
+    """Detectable invariant: a child must never carry issued_at >= parent.revoked_at.
+
+    Such a child was written after the revoke had already landed, which can only
+    happen if validation ran outside the write's critical section (the TOCTOU).
+    With validation and write atomic under one lock, a cross-process revoke
+    either fully precedes the child (child rejected) or fully follows it (child's
+    issued_at < revoked_at). This races both directions many times.
+    """
+    from ledgato.authority import AuthorityStore, parse_time
+
+    violations = []
+    for _ in range(25):
+        seed = AuthorityStore(tmp_path / "authority.json")
+        # fresh parent each round
+        seed._grants.clear(); seed._save()
+        parent = seed.issue(agent="lab-agent", granted_by="ops", purpose="parent",
+                            tools={"github.pull.merge"}, impact_max="destructive",
+                            task_id="t", ttl_seconds=600)
+        with mp.Manager() as mgr:
+            out = mgr.list()
+            barrier = mgr.Barrier(2)
+            procs = [
+                mp.Process(target=_issue_child_worker,
+                           args=(str(tmp_path), parent.id, barrier, out)),
+                mp.Process(target=_revoke_parent_worker,
+                           args=(str(tmp_path), parent.id, barrier, out)),
+            ]
+            for pr in procs: pr.start()
+            for pr in procs: pr.join(timeout=30)
+
+        store = AuthorityStore(tmp_path / "authority.json")
+        parent_now = store.get(parent.id)
+        if not parent_now.revoked_at:
+            continue
+        revoked_at = parse_time(parent_now.revoked_at)
+        for g in store._grants.values():
+            if g.parent_grant_id == parent.id:
+                issued_at = parse_time(g.issued_at)
+                if issued_at >= revoked_at:
+                    violations.append((g.id, g.issued_at, parent_now.revoked_at))
+
+    assert not violations, (
+        f"{len(violations)} child grant(s) committed at/after parent revocation "
+        f"(TOCTOU): {violations[:3]}"
+    )
+
+
+def test_issue_rejects_child_of_already_revoked_parent(tmp_path):
+    """Deterministic companion: revoke first, then issue must fail."""
+    from ledgato.authority import AuthorityStore
+    store = AuthorityStore(tmp_path / "authority.json")
+    parent = store.issue(agent="lab-agent", granted_by="ops", purpose="parent",
+                         tools={"github.pull.merge"}, impact_max="destructive",
+                         task_id="t", ttl_seconds=600)
+    store.revoke(parent.id, revoked_by="ops", reason="done")
+    with pytest.raises(ValueError, match="not effective"):
+        store.issue(agent="lab-agent", granted_by="ops", purpose="child",
+                    tools={"github.pull.merge"}, impact_max="destructive",
+                    task_id="t", parent_grant_id=parent.id, ttl_seconds=60)
