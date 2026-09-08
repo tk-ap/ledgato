@@ -1,7 +1,7 @@
 import pytest
 
 from ledgato.engine import detect_drift, evaluate_action
-from ledgato.models import Action, Policy
+from ledgato.models import Action, Policy, parse_policy
 
 POL = Policy(
     agent="ops-agent",
@@ -37,6 +37,28 @@ def test_deny_impact_escalation():
 def test_deny_domain_out_of_scope():
     d = evaluate_action(POL, Action(tool="search", impact="readonly", domain="prod::customers"))
     assert d.allow is False
+
+
+def test_f1_plural_allow_tools_key_enforced_not_fail_open():
+    # F-1 regression: `allow_tools:` (plural) must parse to a real allowlist
+    # and an off-list tool must be DENIED — never silently permitted.
+    pol = parse_policy(
+        {"agent": "ops-agent", "allow_tools": ["read.docs"], "impact_max": "write"}
+    )
+    assert pol.allow_tools == {"read.docs"}
+    d = evaluate_action(pol, Action(tool="db.write", impact="write"))
+    assert d.allow is False
+    assert "deny" in d.reason.lower()
+
+
+def test_f1_empty_allowlist_denies_all():
+    # F-1 regression: an empty allowlist is fail-closed (DENY-ALL), so a
+    # typo'd/missing key can never silently disable tool enforcement.
+    pol = parse_policy({"agent": "ops-agent", "impact_max": "write"})
+    assert pol.allow_tools == set()
+    d = evaluate_action(pol, Action(tool="read.docs", impact="readonly"))
+    assert d.allow is False
+    assert "deny" in d.reason.lower()
 
 
 def test_drift_detection():
