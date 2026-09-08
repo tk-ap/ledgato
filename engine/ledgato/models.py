@@ -123,30 +123,75 @@ class Policy:
         }
 
 
-def _allow_tools_from(data: dict[str, Any]) -> set[str]:
-    """Merge singular ``allow_tool`` and plural ``allow_tools`` keys.
+_POLICY_KEYS = {
+    "agent",
+    "allow_tool",
+    "allow_tools",
+    "deny_tool",
+    "deny_tools",
+    "approve_tool",
+    "approve_tools",
+    "impact_max",
+    "data_domains",
+    "on_deny",
+    "approval_impact_min",
+    "require_grant",
+}
 
-    Both spellings are accepted (F-1: the plural key used to be silently
-    ignored, parsing to an empty allowlist). When both keys are present the
-    INTERSECTION wins — the stricter of the two declarations — so a stray
-    extra key can only narrow authority, never widen it.
+
+def _validate_policy_keys(data: dict[str, Any]) -> None:
+    unknown = sorted(set(data) - _POLICY_KEYS)
+    if unknown:
+        raise ValueError(
+            "unknown policy key(s): " + ", ".join(unknown)
+            + "; policy parsing fails closed rather than ignoring configuration"
+        )
+
+
+def _aliased_tool_set(
+    data: dict[str, Any], singular_key: str, plural_key: str, *, mode: str
+) -> set[str]:
+    """Read singular/plural aliases without allowing ambiguity to widen authority.
+
+    For allowlists, both declarations means intersection (narrower authority).
+    For deny/approval gates, both declarations means union (more actions gated).
+    Explicit empty declarations still participate, so ``allow_tool: []`` plus a
+    non-empty plural alias resolves to deny-all instead of silently widening.
     """
-    singular = _as_set(data.get("allow_tool"))
-    plural = _as_set(data.get("allow_tools"))
-    if singular and plural:
-        return singular & plural
-    return singular | plural
+    singular_present = singular_key in data
+    plural_present = plural_key in data
+    singular = _as_set(data.get(singular_key))
+    plural = _as_set(data.get(plural_key))
+
+    if singular_present and plural_present:
+        if mode == "intersection":
+            return singular & plural
+        if mode == "union":
+            return singular | plural
+        raise ValueError(f"unsupported alias merge mode: {mode}")
+    if singular_present:
+        return singular
+    if plural_present:
+        return plural
+    return set()
 
 
 def parse_policy(data: dict[str, Any]) -> Policy:
+    _validate_policy_keys(data)
     return Policy(
         agent=data.get("agent", "agent"),
-        allow_tools=_allow_tools_from(data),
-        deny_tools=_as_set(data.get("deny_tool")),
+        allow_tools=_aliased_tool_set(
+            data, "allow_tool", "allow_tools", mode="intersection"
+        ),
+        deny_tools=_aliased_tool_set(
+            data, "deny_tool", "deny_tools", mode="union"
+        ),
         impact_max=data.get("impact_max", "readonly"),
         data_domains=_as_list(data.get("data_domains")),
         on_deny=_as_list(data.get("on_deny", ["alert"])),
-        approval_tools=_as_set(data.get("approve_tool")),
+        approval_tools=_aliased_tool_set(
+            data, "approve_tool", "approve_tools", mode="union"
+        ),
         approval_impact_min=data.get("approval_impact_min"),
         require_grant=bool(data.get("require_grant", False)),
     )
