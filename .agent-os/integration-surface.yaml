@@ -1,0 +1,26 @@
+version: 0.1.0
+product_key: ledgato
+agent_os_repository: tk-ap/agent-os
+routing_source: registry/product-routing.yaml
+
+inbound:
+  - from: agent-os-workforce
+    contract: contracts/capability-manifest.schema.json
+    purpose: receive the minimum declared workforce/tool surface when a governed task materially requires governance or enforcement evaluation
+  - from: agent-os-workforce
+    contract: contracts/work-item.schema.json
+    purpose: receive an explicitly scoped governance/enforcement work item rather than generic sensitive work
+
+outbound:
+  - to: agent-os-workforce
+    contract: contracts/outcome-event.schema.json
+    trigger: a gate, probe, attestation, drift check, or enforcement evaluation produces verifiable evidence
+
+cross_market: []
+
+rules:
+  use_portable_contracts_for_cross_product_handoffs: true
+  cross_market_policy: policies/CROSS_MARKET_POLICY.md
+  integration_claims_require_verified_implementation: true
+  generic_authorization_requests_do_not_route_to_ledgato_by_default: true
+  signed_evidence_does_not_expand_task_authority: true
