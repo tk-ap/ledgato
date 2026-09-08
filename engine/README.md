@@ -119,6 +119,59 @@ Endpoints: `GET /health`, `POST /v1/actions/check`, `POST /v1/probes/run`,
 `POST /v1/ledger/reconcile`, `POST /v1/attestations/verify`,
 `POST /v1/attestations/report`, `POST /v1/attestations/report/verify`.
 
+## Authentication and principals
+
+The API **fails closed**. `create_app()` refuses to start unless a credential is
+configured; pass `require_auth=False` only for an explicitly unauthenticated
+local development instance.
+
+Configure distinct principals with `LEDGATO_PRINCIPALS`, as `id:role:secret`
+triples:
+
+```bash
+export LEDGATO_PRINCIPALS="lab-agent:agent:s1,tk:approver:s2,ops:admin:s3"
+```
+
+Roles and what each may do:
+
+| Role | Governed execution | Decide approvals | Issue/revoke grants |
+| --- | :---: | :---: | :---: |
+| `agent` | yes (as itself only) | no | no |
+| `approver` | no | yes | no |
+| `admin` | no | no | yes |
+
+Identity is taken from the presented credential. `agent`, `granted_by`,
+`revoked_by` and `decided_by` in a request body are optional *claims*: if
+present they must match the authenticated principal, otherwise the request is
+rejected with 403. This is what prevents an agent from approving its own
+request.
+
+### ⚠️ Migration: `LEDGATO_API_KEY` is now an admin credential
+
+**This is a breaking change for existing single-key integrations.**
+
+A configured `LEDGATO_API_KEY` is still accepted, but it is mapped onto an
+`admin` principal. Admins may administer authority; they may **not** drive
+governed execution. Any existing client that used the shared key to call
+`POST /v1/gateway/execute` will now receive **403**, not 200.
+
+This is deliberate and fail-closed: a single shared secret cannot be allowed to
+both request an action and approve it, which is precisely the separation the
+enforcement boundary depends on.
+
+To migrate, give the calling agent its own credential:
+
+```bash
+# before — one shared key for everything
+export LEDGATO_API_KEY="s3cret"
+
+# after — one credential per principal
+export LEDGATO_PRINCIPALS="ops-agent:agent:s1,tk:approver:s2,ops:admin:s3"
+```
+
+The agent principal's `id` must equal the `agent` value the client sends (or the
+client can omit the field entirely and let the credential supply it).
+
 ## Distributed ledger
 
 Each node keeps a full signed, mined chain. To reconcile with a peer:

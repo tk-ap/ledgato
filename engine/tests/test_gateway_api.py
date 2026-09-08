@@ -3,6 +3,7 @@ from fastapi.testclient import TestClient
 
 from ledgato.adapters.base import ExecutionReceipt
 from ledgato.api import create_app
+from ledgato.principals import PrincipalRegistry
 from ledgato.models import Action
 
 
@@ -52,7 +53,13 @@ def build_app(tmp_path, adapter):
         approvals_path=tmp_path / "approvals.json",
         idempotency_path=tmp_path / "idempotency.json",
         adapters={"fake": adapter},
-        api_key="test-key",
+        principals=PrincipalRegistry(
+            [
+                ("ops-agent", "agent", "agent-key"),
+                ("owner", "approver", "approver-key"),
+                ("owner", "admin", "admin-key"),
+            ]
+        ),
     )
 
 
@@ -64,7 +71,16 @@ def setup(tmp_path):
 
 
 def headers():
-    return {"Authorization": "Bearer test-key"}
+    """Credential of the governed agent principal."""
+    return {"Authorization": "Bearer agent-key"}
+
+
+def approver_headers():
+    return {"Authorization": "Bearer approver-key"}
+
+
+def admin_headers():
+    return {"Authorization": "Bearer admin-key"}
 
 
 def test_gateway_requires_api_key(setup):
@@ -102,7 +118,7 @@ def test_approval_pause_approve_resume(setup):
     approval_id = pending["approval"]["id"]
     approved = client.post(
         f"/v1/approvals/{approval_id}/approve",
-        headers=headers(),
+        headers=approver_headers(),
         json={"decided_by": "owner", "jit_ttl_seconds": 60},
     ).json()
     assert approved["jit_grant"]["task_id"] == "t2"
@@ -132,7 +148,7 @@ def test_issue_and_revoke_jit_grant(setup):
     client, _ = setup
     issued = client.post(
         "/v1/authority/grants",
-        headers=headers(),
+        headers=admin_headers(),
         json={
             "agent": "ops-agent",
             "granted_by": "owner",
@@ -149,7 +165,7 @@ def test_issue_and_revoke_jit_grant(setup):
 
     revoked = client.post(
         f"/v1/authority/grants/{grant['id']}/revoke",
-        headers=headers(),
+        headers=admin_headers(),
         json={"revoked_by": "owner", "reason": "task complete"},
     )
     assert revoked.status_code == 200

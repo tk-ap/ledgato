@@ -1,11 +1,20 @@
 """Approval state for consequential actions that must pause before execution."""
 from __future__ import annotations
 
+import errno
 import json
+import os
 import secrets
+import threading
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+try:  # POSIX advisory locking; absent on Windows.
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None
 
 from .models import utcnow
 
@@ -41,7 +50,39 @@ class Approval:
 
 
 class ApprovalStore:
+    @contextmanager
+    def _exclusive(self):
+        """Serialize a read-modify-write across threads *and* processes.
+
+        The approval store is file-backed and each process holds its own
+        in-memory copy, so checking ``status`` against that copy is a
+        time-of-check/time-of-use bug: several workers can each observe
+        APPROVED and each execute the protected action from one human
+        approval. An advisory lock on a sidecar file plus a re-read inside the
+        lock closes that window.
+        """
+        with self._thread_lock:
+            if not self.path or fcntl is None:
+                yield
+                return
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+            fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                self._load()            # discard stale state; re-read under lock
+                yield
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
+
     def __init__(self, path: str | Path | None = None):
+        # Per-instance and reentrant: a class-level lock would serialize
+        # unrelated stores, and a plain Lock would deadlock if a guarded
+        # method ever called another.
+        self._thread_lock = threading.RLock()
         self.path = Path(path) if path else None
         self._items: dict[str, Approval] = {}
         self._load()
@@ -66,40 +107,60 @@ class ApprovalStore:
             requested_at=utcnow().isoformat(),
             requested_by=requested_by,
         )
-        self._items[approval.id] = approval
-        self._save()
+        # _save() rewrites the whole file from this process's snapshot, so the
+        # insert must happen against freshly-read state or concurrent requests
+        # silently drop each other.
+        with self._exclusive():
+            self._items[approval.id] = approval
+            self._save()
         return approval
 
     def get(self, approval_id: str) -> Approval | None:
         return self._items.get(approval_id)
 
     def decide(self, approval_id: str, *, approved: bool, decided_by: str, reason: str | None = None) -> Approval:
-        item = self._require(approval_id)
-        if item.status != PENDING:
-            raise ValueError(f"approval is already {item.status}")
-        item.status = APPROVED if approved else DENIED
-        item.decided_at = utcnow().isoformat()
-        item.decided_by = decided_by
-        item.decision_reason = reason
-        self._save()
-        return item
+        """Record the one and only decision on an approval.
+
+        The PENDING guard is only meaningful when evaluated against current
+        state: without the lock two workers each saw PENDING, both succeeded,
+        and last-writer-won — so a human denial could be silently replaced by
+        an approval.
+        """
+        with self._exclusive():
+            item = self._require(approval_id)
+            if item.status != PENDING:
+                raise ValueError(f"approval is already {item.status}")
+            item.status = APPROVED if approved else DENIED
+            item.decided_at = utcnow().isoformat()
+            item.decided_by = decided_by
+            item.decision_reason = reason
+            self._save()
+            return item
 
     def attach_jit_grant(self, approval_id: str, grant_id: str) -> Approval:
-        item = self._require(approval_id)
-        item.jit_grant_id = grant_id
-        self._save()
-        return item
+        with self._exclusive():
+            item = self._require(approval_id)
+            item.jit_grant_id = grant_id
+            self._save()
+            return item
 
     def consume(self, approval_id: str, resume_token: str) -> Approval:
-        item = self._require(approval_id)
-        if item.status != APPROVED:
-            raise ValueError(f"approval is {item.status}, not APPROVED")
-        if not secrets.compare_digest(item.resume_token, resume_token):
-            raise PermissionError("invalid resume token")
-        item.status = CONSUMED
-        item.consumed_at = utcnow().isoformat()
-        self._save()
-        return item
+        """Claim an approval exactly once.
+
+        The status check and the write happen under an exclusive lock, so a
+        concurrent resume — in this process or another worker — sees CONSUMED
+        and is refused rather than executing the protected action again.
+        """
+        with self._exclusive():
+            item = self._require(approval_id)
+            if item.status != APPROVED:
+                raise ValueError(f"approval is {item.status}, not APPROVED")
+            if not secrets.compare_digest(item.resume_token, resume_token):
+                raise PermissionError("invalid resume token")
+            item.status = CONSUMED
+            item.consumed_at = utcnow().isoformat()
+            self._save()
+            return item
 
     def list(self, *, status: str | None = None) -> list[Approval]:
         items = list(self._items.values())
@@ -121,4 +182,7 @@ class ApprovalStore:
         if not self.path:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps([asdict(i) for i in self._items.values()], indent=2, sort_keys=True))
+        payload = json.dumps([asdict(i) for i in self._items.values()], indent=2, sort_keys=True)
+        tmp = self.path.with_suffix(self.path.suffix + f".tmp.{os.getpid()}")
+        tmp.write_text(payload)
+        tmp.replace(self.path)          # atomic on POSIX
