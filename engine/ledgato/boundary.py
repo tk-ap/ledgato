@@ -59,6 +59,13 @@ class BoundaryEvidence:
     outcome: str
     recorded_at: str = field(default_factory=lambda: utcnow().isoformat())
     protected_action_occurred: Optional[bool] = None
+    #: Stable id for the specific attack vector this evidence concerns (e.g.
+    #: "direct-merge-api", "proc-environ-leak"). A breach and the retest that
+    #: closes it must share a vector; a remediation names the vector it fixes in
+    #: ``resolves_vector``. None for evidence not tied to a single vector.
+    vector: Optional[str] = None
+    #: On a ``remediation`` entry: the vector id it claims to fix.
+    resolves_vector: Optional[str] = None
     ledger_entry_id: Optional[str] = None
     provider_ref: Optional[str] = None
     detail: dict[str, Any] = field(default_factory=dict)
@@ -131,25 +138,39 @@ class EnforcementBoundary:
         evidence = self.verification_evidence
         unresolved: list[BoundaryEvidence] = []
 
-        for index, item in enumerate(evidence):
-            if item.kind not in BYPASS_EVIDENCE_KINDS or item.protected_action_occurred is not True:
+        for index, breach in enumerate(evidence):
+            if breach.kind not in BYPASS_EVIDENCE_KINDS or breach.protected_action_occurred is not True:
                 continue
 
+            # A breach must carry a vector id; an unlabeled breach can never be
+            # matched to a specific remediation and so is never auto-resolved.
+            if not breach.vector:
+                unresolved.append(breach)
+                continue
+
+            # A remediation, recorded after the breach, that names THIS vector.
             remediation_at = next(
-                (j for j in range(index + 1, len(evidence)) if evidence[j].kind == "remediation"),
+                (
+                    j
+                    for j in range(index + 1, len(evidence))
+                    if evidence[j].kind == "remediation"
+                    and evidence[j].resolves_vector == breach.vector
+                ),
                 None,
             )
             if remediation_at is None:
-                unresolved.append(item)
+                unresolved.append(breach)
                 continue
 
+            # A clean adversarial retest of THE SAME vector, after that remediation.
             retested_clean = any(
                 evidence[j].kind in BYPASS_EVIDENCE_KINDS
+                and evidence[j].vector == breach.vector
                 and evidence[j].protected_action_occurred is False
                 for j in range(remediation_at + 1, len(evidence))
             )
             if not retested_clean:
-                unresolved.append(item)
+                unresolved.append(breach)
 
         return unresolved
 
@@ -237,6 +258,8 @@ class BoundaryStore:
         summary: str,
         outcome: str,
         protected_action_occurred: bool | None = None,
+        vector: str | None = None,
+        resolves_vector: str | None = None,
         ledger_entry_id: str | None = None,
         provider_ref: str | None = None,
         detail: dict[str, Any] | None = None,
@@ -254,6 +277,8 @@ class BoundaryStore:
             summary=summary,
             outcome=outcome,
             protected_action_occurred=protected_action_occurred,
+            vector=vector,
+            resolves_vector=resolves_vector,
             ledger_entry_id=ledger_entry_id,
             provider_ref=provider_ref,
             detail=detail or {},

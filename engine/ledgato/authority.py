@@ -78,46 +78,70 @@ class AuthorityStore:
         domains = list(data_domains)
         expires_at = (now + timedelta(seconds=ttl_seconds)).isoformat() if ttl_seconds else None
 
-        if parent_grant_id:
-            parent = self._require(parent_grant_id)
-            valid, reason = self.validate(parent_grant_id)
-            if not valid:
-                raise ValueError(f"parent grant is not effective: {reason}")
-            if parent.agent != agent:
-                raise ValueError("child grant agent must match parent grant agent")
-            if parent.tools and not tool_set.issubset(parent.tools):
-                raise ValueError("child grant cannot add tools outside parent authority")
-            if IMPACTS.get(impact_max, 1) > parent.impact_max_severity():
-                raise ValueError("child grant cannot exceed parent impact authority")
-            if parent.task_id and task_id != parent.task_id:
-                raise ValueError("child grant must remain bound to the parent task")
-            if parent.data_domains:
-                outside = [d for d in domains if not _domain_allowed(d, parent.data_domains)]
-                if outside:
-                    raise ValueError(f"child grant domains exceed parent authority: {outside}")
-            parent_expiry = parse_time(parent.expires_at)
-            child_expiry = parse_time(expires_at)
-            if parent_expiry and (not child_expiry or child_expiry > parent_expiry):
-                expires_at = parent_expiry.isoformat()
-
-        grant = AuthorityGrant(
-            id=f"grant_{secrets.token_urlsafe(12)}",
-            agent=agent,
-            granted_by=granted_by,
-            purpose=purpose,
-            tools=tool_set,
-            data_domains=domains,
-            impact_max=impact_max,
-            task_id=task_id,
-            credential_ref=credential_ref,
-            parent_grant_id=parent_grant_id,
-            issued_at=now.isoformat(),
-            expires_at=expires_at,
-        )
+        # Parent-effectiveness validation and the child write must be one atomic
+        # step. Validating before the lock is a TOCTOU: a concurrent revoke of
+        # the parent could win between the check and the write, committing a
+        # child of an already-revoked parent. _exclusive() reloads state under
+        # the lock, so the re-validation below sees any revocation that has
+        # landed.
         with self._exclusive():
+            if parent_grant_id:
+                expires_at = self._validate_parent(
+                    parent_grant_id, agent=agent, tool_set=tool_set,
+                    impact_max=impact_max, task_id=task_id, domains=domains,
+                    child_expires_at=expires_at,
+                )
+            grant = AuthorityGrant(
+                id=f"grant_{secrets.token_urlsafe(12)}",
+                agent=agent,
+                granted_by=granted_by,
+                purpose=purpose,
+                tools=tool_set,
+                data_domains=domains,
+                impact_max=impact_max,
+                task_id=task_id,
+                credential_ref=credential_ref,
+                parent_grant_id=parent_grant_id,
+                issued_at=now.isoformat(),
+                expires_at=expires_at,
+            )
             self._grants[grant.id] = grant
             self._save()
         return grant
+
+    def _validate_parent(
+        self, parent_grant_id: str, *, agent: str, tool_set: set[str],
+        impact_max: str, task_id: str | None, domains: list[str],
+        child_expires_at: str | None,
+    ) -> str | None:
+        """Validate a child against its parent. MUST run inside _exclusive().
+
+        Returns the (possibly clamped) child expiry. Raises if the parent is
+        not effective at this instant or the child would exceed it. Because the
+        caller holds the lock and reloaded state, a revocation that has been
+        persisted is visible here.
+        """
+        parent = self._require(parent_grant_id)
+        valid, reason = self.validate(parent_grant_id)
+        if not valid:
+            raise ValueError(f"parent grant is not effective: {reason}")
+        if parent.agent != agent:
+            raise ValueError("child grant agent must match parent grant agent")
+        if parent.tools and not tool_set.issubset(parent.tools):
+            raise ValueError("child grant cannot add tools outside parent authority")
+        if IMPACTS.get(impact_max, 1) > parent.impact_max_severity():
+            raise ValueError("child grant cannot exceed parent impact authority")
+        if parent.task_id and task_id != parent.task_id:
+            raise ValueError("child grant must remain bound to the parent task")
+        if parent.data_domains:
+            outside = [d for d in domains if not _domain_allowed(d, parent.data_domains)]
+            if outside:
+                raise ValueError(f"child grant domains exceed parent authority: {outside}")
+        parent_expiry = parse_time(parent.expires_at)
+        child_expiry = parse_time(child_expires_at)
+        if parent_expiry and (not child_expiry or child_expiry > parent_expiry):
+            return parent_expiry.isoformat()
+        return child_expires_at
 
     def get(self, grant_id: str | None) -> AuthorityGrant | None:
         if not grant_id:

@@ -230,13 +230,19 @@ def test_remediated_and_retested_boundary_can_reach_verified(lab):
     lab.record_evidence(
         "github_lab_merge", kind="bypass_attempt",
         summary="concurrent multi-process resume", outcome="merged twice",
-        protected_action_occurred=True,
+        protected_action_occurred=True, vector="approval-replay",
     )
     assert lab.get("github_lab_merge").bypass_status == "BYPASS_FOUND"
 
     lab.record_evidence(
         "github_lab_merge", kind="remediation",
         summary="consume() now locks and re-reads", outcome="fixed",
+        resolves_vector="approval-replay",
+    )
+    lab.record_evidence(
+        "github_lab_merge", kind="approval_abuse_attempt",
+        summary="replay retested clean", outcome="rejected",
+        protected_action_occurred=False, vector="approval-replay",
     )
     _full_suite(lab)
 
@@ -252,12 +258,13 @@ def test_historical_breach_is_never_erased(lab):
     """Verification must not launder the record."""
     lab.record_evidence(
         "github_lab_merge", kind="bypass_attempt", summary="race",
-        outcome="merged twice", protected_action_occurred=True,
+        outcome="merged twice", protected_action_occurred=True, vector="race-v",
     )
-    lab.record_evidence("github_lab_merge", kind="remediation", summary="fix", outcome="fixed")
+    lab.record_evidence("github_lab_merge", kind="remediation", summary="fix",
+        outcome="fixed", resolves_vector="race-v")
     lab.record_evidence(
         "github_lab_merge", kind="bypass_attempt", summary="retest",
-        outcome="rejected", protected_action_occurred=False,
+        outcome="rejected", protected_action_occurred=False, vector="race-v",
     )
     _full_suite(lab)
     lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="j")
@@ -350,3 +357,60 @@ def test_provider_readback_alone_does_not_verify(lab):
                         summary="readback", outcome="confirmed")
     with pytest.raises(ValueError, match="no bypass/leakage/escalation attempts"):
         lab.set_status("github_lab_merge", "VERIFIED", attested_by="c", justification="j")
+
+
+# --- Codex blocker #2: remediation must be vector-bound -------------------
+
+def test_unrelated_remediation_does_not_close_a_breach(lab):
+    """A remediation + clean retest of a DIFFERENT vector must not resolve a breach."""
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="breach on vector A", outcome="merged",
+        protected_action_occurred=True, vector="vector-A")
+    # remediation + retest, but for an unrelated vector B
+    lab.record_evidence("github_lab_merge", kind="remediation",
+        summary="fix for B", outcome="fixed", resolves_vector="vector-B")
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="clean retest of B", outcome="rejected",
+        protected_action_occurred=False, vector="vector-B")
+
+    assert len(lab.get("github_lab_merge").unresolved_bypasses()) == 1, "breach A was wrongly closed by B's remediation"
+    with pytest.raises(ValueError, match="lack remediation"):
+        lab.set_status("github_lab_merge", "VERIFIED", attested_by="c", justification="j")
+
+
+def test_same_vector_remediation_and_retest_closes_the_breach(lab):
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="breach on A", outcome="merged",
+        protected_action_occurred=True, vector="vector-A")
+    lab.record_evidence("github_lab_merge", kind="remediation",
+        summary="fix for A", outcome="fixed", resolves_vector="vector-A")
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="clean retest of A", outcome="rejected",
+        protected_action_occurred=False, vector="vector-A")
+    assert lab.get("github_lab_merge").unresolved_bypasses() == []
+
+
+def test_remediation_of_right_vector_but_retest_of_wrong_vector_stays_open(lab):
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="breach A", outcome="merged",
+        protected_action_occurred=True, vector="vector-A")
+    lab.record_evidence("github_lab_merge", kind="remediation",
+        summary="fix A", outcome="fixed", resolves_vector="vector-A")
+    # retest is clean but of vector B, not A
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="retest B", outcome="rejected",
+        protected_action_occurred=False, vector="vector-B")
+    assert len(lab.get("github_lab_merge").unresolved_bypasses()) == 1
+
+
+def test_breach_without_vector_is_never_auto_resolved(lab):
+    """An unlabeled breach can't be matched to a fix, so it stays unresolved."""
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="unlabeled breach", outcome="merged",
+        protected_action_occurred=True)  # no vector
+    lab.record_evidence("github_lab_merge", kind="remediation",
+        summary="some fix", outcome="fixed", resolves_vector="anything")
+    lab.record_evidence("github_lab_merge", kind="bypass_attempt",
+        summary="clean", outcome="rejected", protected_action_occurred=False,
+        vector="anything")
+    assert len(lab.get("github_lab_merge").unresolved_bypasses()) == 1
