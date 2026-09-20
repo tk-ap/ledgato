@@ -210,8 +210,15 @@ def cmd_sync(args) -> int:
 def cmd_api(args) -> int:
     import uvicorn
 
-    from .api import app
+    from .api import create_app
 
+    # Build the app explicitly so --config/--ledger/--keys select the exact
+    # enforcement state instead of silently falling back to cwd defaults.
+    app = create_app(
+        config_path=args.config,
+        ledger_path=args.ledger,
+        key_dir=args.keys,
+    )
     uvicorn.run(app, host=args.host, port=args.port)
     return 0
 
