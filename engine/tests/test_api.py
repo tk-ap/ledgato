@@ -128,3 +128,52 @@ def test_health_reports_difficulty(client):
     r = client.get("/health").json()
     assert "difficulty" in r
     assert r["version"] == "0.3.0"
+
+
+def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossing(tmp_path):
+    import yaml
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "examples" / "agent-os-workspace-fence.yaml"
+    doc = yaml.safe_load(source.read_text())
+    policy = doc["policies"][0]
+    assert policy["agent"] == "agent-os-workspace"
+    assert policy["allow_tool"] == ["agentos.dispatch"]
+    assert policy["impact_max"] == "write"
+    assert policy["data_domains"] == ["workspace-command::*"]
+
+    cfg = tmp_path / "fence.yaml"
+    cfg.write_text(source.read_text())
+    app = create_app(
+        config_path=cfg,
+        ledger_path=tmp_path / "ledger.jsonl",
+        key_dir=tmp_path / "keys",
+        authority_path=tmp_path / "authority.json",
+        approvals_path=tmp_path / "approvals.json",
+        adapters={},
+        require_auth=False,
+    )
+    local = TestClient(app)
+
+    allowed = local.post("/v1/actions/check", json={
+        "agent": "agent-os-workspace",
+        "task_id": "workspace-command:abc",
+        "action": {
+            "tool": "agentos.dispatch",
+            "impact": "write",
+            "domain": "workspace-command::abc",
+        },
+    })
+    assert allowed.status_code == 200
+    assert allowed.json()["outcome"] == "ALLOW"
+
+    escaped = local.post("/v1/actions/check", json={
+        "agent": "agent-os-workspace",
+        "action": {
+            "tool": "github.merge",
+            "impact": "write",
+            "domain": "workspace-command::abc",
+        },
+    })
+    assert escaped.status_code == 200
+    assert escaped.json()["outcome"] == "DENY"
