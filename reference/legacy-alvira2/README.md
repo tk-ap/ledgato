@@ -22,7 +22,7 @@ Nothing under `reference/legacy-alvira2/` is imported by those paths, registered
 
 It targets the older policy API and is **not current runnable engine code**. Port the idea to the current `evaluate_action()` / gateway model before use.
 
-### UI reference
+### UI design ancestry
 
 `ui/` preserves selected authority/runtime visualization work:
 
@@ -31,6 +31,24 @@ It targets the older policy API and is **not current runnable engine code**. Por
 - attack/proof replay visualization
 - authority route composition
 - runtime decision surface
+
+These are not deprecated simply because the old application is obsolete. Their interaction model is useful design ancestry for the current Ledgato control-plane redesign: prefer spatial authority paths, visible enforcement state, evidence-on-demand, and interactive system behavior over copy-heavy dashboard panels.
+
+The intended migration direction is:
+
+```text
+legacy interaction concepts
+        ↓
+current Ledgato information architecture
+        +
+current enforcement/gateway evidence
+        +
+current ecosystem visual system / 21st.dev-era primitives
+        ↓
+new immersive Ledgato control plane
+```
+
+Do **not** transplant the old route architecture, stale ALVIRA wiring, auth/database layer, runtime implementation, or styling wholesale. Reimplement useful interaction patterns against the canonical current engine and current web surface.
 
 These files retain stale imports and old ALVIRA-specific assumptions by design. They are design/source references only and must not supersede the current live UI.
 
