@@ -119,6 +119,31 @@ Endpoints: `GET /health`, `POST /v1/actions/check`, `POST /v1/probes/run`,
 `POST /v1/ledger/reconcile`, `POST /v1/attestations/verify`,
 `POST /v1/attestations/report`, `POST /v1/attestations/report/verify`.
 
+## AgentOS Workspace dispatch boundary
+
+A dedicated policy for ASHWOOD Workspace owner commands lives at
+`examples/agent-os-workspace-fence.yaml`. It permits exactly one pre-execution
+crossing: `agentos.dispatch` for the `agent-os-workspace` principal and the
+`workspace-command::*` domain.
+
+Run it locally with a dedicated agent credential:
+
+```bash
+export LEDGATO_PRINCIPALS="agent-os-workspace:agent:$AGENT_OS_LEDGATO_AGENT_TOKEN"
+ledgato api \
+  --config examples/agent-os-workspace-fence.yaml \
+  --ledger .state/agentos-workspace-ledger.jsonl \
+  --keys .state/agentos-workspace-keys \
+  --host 127.0.0.1 \
+  --port 8000
+```
+
+AgentOS calls `POST /v1/actions/check` immediately before it enqueues the
+directed work. Only **ALLOW** crosses the boundary. **DENY**, **APPROVE**,
+missing credentials, malformed responses, or an unavailable Ledgato service
+fail closed and leave the work unexecuted. This fence authorizes entry into the
+governed queue only; it does not authorize any later publish, deploy, secret,
+purchase, browser, or external-system action.
 ## Authentication and principals
 
 The API **fails closed**. `create_app()` refuses to start unless a credential is
