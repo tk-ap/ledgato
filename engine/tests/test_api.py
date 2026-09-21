@@ -140,7 +140,12 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
     assert policy["agent"] == "agent-os-workspace"
     assert policy["allow_tool"] == ["agentos.dispatch"]
     assert policy["impact_max"] == "write"
-    assert policy["data_domains"] == ["workspace-command::*"]
+    assert policy["data_domains"] == [
+        "workspace-command::*",
+        "telegram-command::*",
+        "hermes-command::*",
+        "autonomous-backlog::*",
+    ]
 
     cfg = tmp_path / "fence.yaml"
     cfg.write_text(source.read_text())
@@ -155,17 +160,34 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
     )
     local = TestClient(app)
 
-    allowed = local.post("/v1/actions/check", json={
+    for domain in (
+        "workspace-command::abc",
+        "telegram-command::abc",
+        "hermes-command::abc",
+        "autonomous-backlog::abc",
+    ):
+        allowed = local.post("/v1/actions/check", json={
+            "agent": "agent-os-workspace",
+            "task_id": domain,
+            "action": {
+                "tool": "agentos.dispatch",
+                "impact": "write",
+                "domain": domain,
+            },
+        })
+        assert allowed.status_code == 200
+        assert allowed.json()["outcome"] == "ALLOW"
+
+    escaped_domain = local.post("/v1/actions/check", json={
         "agent": "agent-os-workspace",
-        "task_id": "workspace-command:abc",
         "action": {
             "tool": "agentos.dispatch",
             "impact": "write",
-            "domain": "workspace-command::abc",
+            "domain": "credentials::production",
         },
     })
-    assert allowed.status_code == 200
-    assert allowed.json()["outcome"] == "ALLOW"
+    assert escaped_domain.status_code == 200
+    assert escaped_domain.json()["outcome"] == "DENY"
 
     escaped = local.post("/v1/actions/check", json={
         "agent": "agent-os-workspace",
