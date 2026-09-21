@@ -18,7 +18,10 @@ const required=[
   'DEMO · SAMPLE ENVIRONMENT',
   'ALVIRA · CONNECTION STATUS',
   'INTERACTIVE DEMO · NO EXTERNAL ACTION',
-  'Real GitHub denial proof.'
+  'Real GitHub denial proof.',
+  'Verified · bounded',
+  'Fresh external design-partner E2E',
+  'not a universal bypass-impossibility claim'
 ]
 for(const phrase of required){
   if(!text.includes(phrase)) throw new Error(`Required claim/state distinction missing: ${phrase}`)
