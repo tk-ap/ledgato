@@ -41,6 +41,9 @@ class Approval:
     resume_token: str = field(default_factory=lambda: secrets.token_urlsafe(24))
     jit_grant_id: str | None = None
     consumed_at: str | None = None
+    #: Public campaign binding for an adversarial action, persisted so resume
+    #: can revalidate the campaign authority. None for operational actions.
+    campaign_context: dict[str, Any] | None = None
 
     def to_dict(self, *, include_resume_token: bool = False) -> dict[str, Any]:
         data = asdict(self)
@@ -96,6 +99,7 @@ class ApprovalStore:
         action: dict[str, Any],
         grant_id: str | None,
         requested_by: str | None = None,
+        campaign_context: dict[str, Any] | None = None,
     ) -> Approval:
         approval = Approval(
             id=f"approval_{secrets.token_urlsafe(12)}",
@@ -106,6 +110,7 @@ class ApprovalStore:
             grant_id=grant_id,
             requested_at=utcnow().isoformat(),
             requested_by=requested_by,
+            campaign_context=campaign_context,
         )
         # _save() rewrites the whole file from this process's snapshot, so the
         # insert must happen against freshly-read state or concurrent requests

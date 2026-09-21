@@ -24,6 +24,12 @@ from .principals import (
     enforce_claim,
 )
 from .authority import AuthorityStore
+from .campaign import (
+    CampaignAuthorityStore,
+    CampaignError,
+    authorize_campaign_action,
+    build_authority,
+)
 from .crypto import Signer
 from .distributed import Node
 from .engine import DENY, Decision, evaluate_action
@@ -80,6 +86,24 @@ class GatewayRequest(BaseModel):
     grant_id: Optional[str] = None
     requested_by: Optional[str] = None
     idempotency_key: Optional[str] = None
+    # Adversarial campaign context. Required when the caller's trust domain is
+    # adversarial; ignored for operational callers.
+    campaign_id: Optional[str] = None
+    authority_ref: Optional[str] = None
+    campaign_digest: Optional[str] = None
+    attack_surface: Optional[list[str]] = None
+    # Execution metadata only; grants nothing.
+    executor_provider: Optional[str] = None
+
+
+class CampaignRegisterRequest(BaseModel):
+    principal_id: str
+    envelope: dict[str, Any]
+
+
+class CampaignRevokeRequest(BaseModel):
+    reason: str
+    revoked_by: Optional[str] = None
 
 
 class GrantIssueRequest(BaseModel):
@@ -137,6 +161,7 @@ def create_app(
     authority_path: str | Path | None = "authority.json",
     approvals_path: str | Path | None = "approvals.json",
     idempotency_path: str | Path | None = "idempotency.json",
+    campaigns_path: str | Path | None = "campaigns.json",
     api_key: str | None = None,
     principals: PrincipalRegistry | None = None,
     require_auth: bool = True,
@@ -162,6 +187,7 @@ def create_app(
     authority = AuthorityStore(authority_path)
     approvals = ApprovalStore(approvals_path)
     idempotency = IdempotencyStore(idempotency_path)
+    campaigns = CampaignAuthorityStore(campaigns_path)
     registered_adapters = adapters if adapters is not None else _default_adapters_from_env()
     gateway = EnforcementGateway(
         policies=policies,
@@ -170,6 +196,7 @@ def create_app(
         authority=authority,
         approvals=approvals,
         idempotency=idempotency,
+        campaigns=campaigns,
     )
 
     app = FastAPI(title="Ledgato", version="0.3.0")
@@ -177,6 +204,7 @@ def create_app(
     app.state.authority = authority
     app.state.approvals = approvals
     app.state.idempotency = idempotency
+    app.state.campaigns = campaigns
     app.state.adapters = registered_adapters
 
     configured_key = api_key or os.getenv("LEDGATO_API_KEY")
@@ -283,11 +311,50 @@ def create_app(
 
     @app.post("/v1/gateway/execute")
     def gateway_execute(req: GatewayRequest, principal: Principal = Depends(_principal)):
+        # A verifier is observation-only and must never reach execution,
+        # regardless of role. Fail closed before anything else.
+        if principal.is_verifier():
+            raise HTTPException(
+                403, f"verifier principal '{principal.id}' may not execute actions"
+            )
         # An agent principal may only ever act as itself. Approver/admin
         # principals are not permitted to drive agent execution at all, so a
         # human credential cannot be used to launder an agent action.
         _require_role(principal, allowed={"agent"}, action="execute governed actions")
         agent_id = _claim(principal, req.agent, field="agent")
+
+        campaign_context = None
+        if principal.is_adversarial():
+            # Bind adversarial execution to a currently valid campaign, checked
+            # against the persisted authority before the adapter can run. Over-
+            # scope is DENY, never APPROVE, and never reaches idempotency.
+            verdict = authorize_campaign_action(
+                campaigns,
+                principal_id=principal.id,
+                campaign_id=req.campaign_id,
+                authority_ref=req.authority_ref,
+                campaign_digest=req.campaign_digest,
+                attack_surface=req.attack_surface,
+            )
+            campaign_context = {
+                "principal_id": principal.id,
+                "principal_role": principal.role,
+                "trust_domain": principal.trust_domain,
+                "campaign_id": req.campaign_id,
+                "authority_ref": req.authority_ref,
+                "campaign_digest": req.campaign_digest,
+                "attack_surface": req.attack_surface,
+                "executor_provider": req.executor_provider,
+            }
+            if not verdict.allow:
+                try:
+                    return gateway.deny_campaign(
+                        agent=agent_id, adapter=req.adapter,
+                        action=_action(req.action), reason=verdict.reason,
+                        campaign_context=campaign_context,
+                    )
+                except KeyError as exc:
+                    raise HTTPException(404, str(exc)) from exc
         try:
             return gateway.execute(
                 agent=agent_id,
@@ -297,6 +364,7 @@ def create_app(
                 grant_id=req.grant_id,
                 requested_by=principal.id,
                 idempotency_key=req.idempotency_key,
+                campaign_context=campaign_context,
             )
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -304,6 +372,48 @@ def create_app(
             raise HTTPException(409, str(exc)) from exc
         except Exception as exc:
             raise HTTPException(502, f"protected execution failed: {exc}") from exc
+
+    @app.post("/v1/campaigns")
+    def register_campaign(
+        req: CampaignRegisterRequest, principal: Principal = Depends(_principal)
+    ):
+        # Registering campaign authority is a control-plane act. An adversarial
+        # principal can never create, widen, or replace its own authorization.
+        _require_role(principal, allowed={"admin"}, action="register campaign authority")
+        try:
+            authority = build_authority(req.envelope, expected_principal_id=req.principal_id)
+            pinned = campaigns.register(authority)
+        except CampaignError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        ledger.append(
+            req.principal_id, "CAMPAIGN_REGISTERED",
+            {"campaign_id": pinned.campaign_id, "campaign_digest": pinned.campaign_digest,
+             "authority_ref": pinned.authority_ref, "registered_by": principal.id},
+            action="campaign.register",
+        )
+        return pinned.to_dict()
+
+    @app.post("/v1/campaigns/{campaign_id}/revoke")
+    def revoke_campaign(
+        campaign_id: str, req: CampaignRevokeRequest,
+        principal: Principal = Depends(_principal),
+    ):
+        _require_role(principal, allowed={"admin"}, action="revoke campaign authority")
+        revoked_by = _claim(principal, req.revoked_by, field="revoked_by")
+        try:
+            authority = campaigns.revoke(campaign_id, revoked_by=revoked_by, reason=req.reason)
+        except KeyError as exc:
+            raise HTTPException(404, f"unknown campaign '{campaign_id}'") from exc
+        ledger.append(
+            authority.principal_id, "CAMPAIGN_REVOKED",
+            {"campaign_id": campaign_id, "revoked_by": revoked_by, "reason": req.reason},
+            action="campaign.revoke",
+        )
+        return authority.to_dict()
+
+    @app.get("/v1/campaigns", dependencies=[Depends(_auth)])
+    def list_campaigns():
+        return {"campaigns": [c.to_dict() for c in campaigns.list()]}
 
     @app.post("/v1/authority/grants")
     def issue_grant(req: GrantIssueRequest, principal: Principal = Depends(_principal)):
