@@ -10,6 +10,7 @@ from typing import Any
 from .adapters.base import EnforcementAdapter, ExecutionReceipt
 from .approvals import APPROVED, ApprovalStore
 from .boundary import BoundaryStore
+from .campaign import CampaignAuthorityStore, authorize_campaign_action
 from .authority import AuthorityStore
 from .engine import ALLOW, APPROVE, DENY, Decision, detect_drift, evaluate_action
 from .idempotency import IdempotencyStore
@@ -28,6 +29,7 @@ class EnforcementGateway:
         approvals: ApprovalStore | None = None,
         idempotency: IdempotencyStore | None = None,
         boundaries: BoundaryStore | None = None,
+        campaigns: CampaignAuthorityStore | None = None,
     ):
         self.policies = policies
         self.adapters = adapters
@@ -35,6 +37,9 @@ class EnforcementGateway:
         self.authority = authority or AuthorityStore()
         self.approvals = approvals or ApprovalStore()
         self.idempotency = idempotency or IdempotencyStore()
+        #: Optional pinned adversarial-campaign authority. When an execute call
+        #: carries campaign_context, resume revalidates against this store.
+        self.campaigns = campaigns or CampaignAuthorityStore()
         #: Optional. When present, decisions are filed as boundary evidence.
         #: Boundaries are never auto-created — an unregistered target is simply
         #: not tracked, so this cannot drift into an asset inventory.
@@ -65,6 +70,7 @@ class EnforcementGateway:
         grant_id: str | None = None,
         requested_by: str | None = None,
         idempotency_key: str | None = None,
+        campaign_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         # Validate all deterministic local prerequisites before reserving the
         # operation key. Configuration mistakes must not poison a key as an
@@ -85,6 +91,7 @@ class EnforcementGateway:
             "task_id": task_id,
             "grant_id": grant_id,
             "requested_by": requested_by,
+            "campaign_context": campaign_context,
         }
         if idempotency_key:
             cached = self.idempotency.begin(idempotency_key, request_record)
@@ -99,6 +106,7 @@ class EnforcementGateway:
             "authority": grant.to_dict() if grant else None,
             "requested_by": requested_by,
             "idempotency_key": idempotency_key,
+            "campaign": campaign_context,
         }
 
         if decision.outcome == DENY:
@@ -119,6 +127,7 @@ class EnforcementGateway:
                 action=action.to_dict(),
                 grant_id=grant_id,
                 requested_by=requested_by,
+                campaign_context=campaign_context,
             )
             evidence = {
                 **base_evidence,
@@ -151,6 +160,7 @@ class EnforcementGateway:
             grant=grant,
             requested_by=requested_by,
             approval_id=None,
+            campaign_context=campaign_context,
         )
         return self._complete_idempotent(idempotency_key, result)
 
@@ -210,6 +220,35 @@ class EnforcementGateway:
         action = Action(**consumed.action)
         pol = self._policy(consumed.agent)
         target = self._adapter(consumed.adapter)
+
+        # An adversarial approval carries its campaign binding. Revalidate the
+        # persisted campaign authority before executing: a prior human approval
+        # cannot resurrect authority that has since expired, been revoked, had
+        # its digest changed, or fallen out of scope. This runs after consume,
+        # so exactly-once resume is unaffected; a denied campaign simply does
+        # not reach the adapter.
+        ctx = consumed.campaign_context
+        if ctx:
+            verdict = authorize_campaign_action(
+                self.campaigns,
+                principal_id=ctx.get("principal_id"),
+                campaign_id=ctx.get("campaign_id"),
+                authority_ref=ctx.get("authority_ref"),
+                campaign_digest=ctx.get("campaign_digest"),
+                attack_surface=ctx.get("attack_surface"),
+            )
+            if not verdict.allow:
+                denied = Decision(
+                    allow=False, outcome=DENY,
+                    reason=f"DENY: campaign revalidation on resume — {verdict.reason}",
+                    reasons=[verdict.reason], policy=pol.agent,
+                    on_deny=list(pol.on_deny),
+                )
+                return self._record_denial(
+                    agent=consumed.agent, target=target, action=action,
+                    decision=denied,
+                    evidence={"approval_id": consumed.id, "campaign": ctx},
+                )
         effective_grant_id = consumed.jit_grant_id or consumed.grant_id
         grant, decision = self._decide(
             policy=pol,
@@ -236,6 +275,7 @@ class EnforcementGateway:
             grant=grant,
             requested_by=consumed.requested_by,
             approval_id=consumed.id,
+            campaign_context=consumed.campaign_context,
         )
 
     def _decide(
@@ -367,6 +407,7 @@ class EnforcementGateway:
         grant: AuthorityGrant | None,
         requested_by: str | None,
         approval_id: str | None,
+        campaign_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         receipt: ExecutionReceipt = target.execute(action)
         verification = target.verify(action, receipt)
@@ -383,6 +424,7 @@ class EnforcementGateway:
             "boundary_crossed": bool(receipt.executed),
             "receipt": receipt.to_dict(),
             "verification": verification,
+            "campaign": campaign_context,
         }
         entry = self.ledger.append(agent, ALLOW, evidence, action=action.tool)
         self._file_boundary_evidence(
@@ -422,6 +464,34 @@ class EnforcementGateway:
         if not adapter:
             raise KeyError(f"no adapter named '{name}'")
         return adapter
+
+
+    def deny_campaign(
+        self,
+        *,
+        agent: str,
+        adapter: str,
+        action: Action,
+        reason: str,
+        campaign_context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Record an adversarial over-scope / invalid-campaign DENY.
+
+        No adapter is invoked and no idempotency key is reserved: an
+        out-of-envelope adversarial request never reaches the protected system
+        and is never laundered into an APPROVE.
+        """
+        target = self._adapter(adapter)
+        decision = Decision(
+            allow=False, outcome=DENY, reason=f"DENY: {reason}",
+            reasons=[reason],
+            policy=self.policies[agent].agent if agent in self.policies else agent,
+            on_deny=list(self.policies[agent].on_deny) if agent in self.policies else [],
+        )
+        return self._record_denial(
+            agent=agent, target=target, action=action, decision=decision,
+            evidence={"campaign": campaign_context},
+        )
 
 
 def _declared_for_adapter(policy: Policy, adapter: str, observed: set[str]) -> set[str]:
