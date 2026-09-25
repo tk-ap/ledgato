@@ -5,9 +5,25 @@
   "buildCommand": "cd web && npm run test && npm run build",
   "outputDirectory": "web/dist",
   "rewrites": [
-    { "source": "/app/:path*", "destination": "/index.html" },
-    { "source": "/agent-controls/:path*", "destination": "/index.html" },
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/signup", "destination": "/index.html" }
+    {
+      "source": "/app/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/agent-controls/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/how-it-works/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/signup",
+      "destination": "/index.html"
+    }
   ]
 }
