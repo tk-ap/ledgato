@@ -265,6 +265,50 @@ It can surface:
 
 This wedge should prove the assurance model without redefining the entire company as a PR tool.
 
+## Product delivery model: infrastructure first, console second
+
+Ledgato should **not require its website to be open for enforcement to work**.
+
+The product is attached to an agent's real execution path once, then operates without a human actively using the console. The browser experience is a control room for configuration, exception handling, and evidence; it is not the execution engine and must not be an activation dependency.
+
+The preferred packaging model has three primary surfaces:
+
+1. **Ledgato Engine** — evaluates and records boundary decisions.
+2. **Ledgato Adapters / SDK / gateway integrations** — place the engine in the actual execution path for MCP, A2A, GitHub, x402, APIs, runtimes, and other protected systems.
+3. **Ledgato Console** — lets a human define authority, inspect protected systems, handle approval-required actions, review drift, and inspect evidence.
+
+A lightweight **agent kit / skill** may teach an agent how to interpret Ledgato responses, approval states, permits, and resume semantics. It is an integration aid, **not the security boundary**. A prompt, skill, or agent instruction that says "ask Ledgato first" is not sufficient enforcement because the agent may ignore it, lose it, or reach the protected system through another path.
+
+The protected capability or credential should sit behind an enforceable adapter/gateway wherever possible:
+
+```text
+agent
+  ↓
+Ledgato adapter / gateway
+  ↓
+ALLOW / DENY / APPROVE
+  ↓
+protected credential / tool / API
+  ↓
+downstream verification
+```
+
+### Autonomy invariant
+
+> **Closing the Ledgato tab must not weaken, disable, or pause governance.**
+
+If enforcement depends on an open browser session, a foreground dashboard, or a human continuously watching the product, the integration does not satisfy the intended autonomous-agent model.
+
+Human interaction should occur only when policy requires it, for example an `APPROVE` decision. The approval may be surfaced through the Ledgato console or an embedded/native notification surface, and a valid scoped approval should allow the agent to resume automatically without turning the console into an operating workspace.
+
+### Commercial / onboarding shape
+
+The product should be understandable as:
+
+**Connect the agent/runtime → connect protected systems → define the authority envelope → leave it running.**
+
+The website should communicate that the value happens while the user is **not** in Ledgato. The product is not "another AI dashboard"; the dashboard exists so the human can understand and control an otherwise autonomous enforcement system.
+
 ## Embedded experience
 
 khrystal should not become an extra mandatory destination in the user’s workflow.
