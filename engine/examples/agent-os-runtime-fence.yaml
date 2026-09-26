@@ -1,0 +1,28 @@
+# AgentOS consequential GitHub-action boundary.
+#
+# AgentOS/harnesses may propose these exact actions, but only Ledgato owns the
+# provider credential and may execute them. Every mutation requires an owner
+# Allow-once decision; the gateway then mints a narrow JIT grant and resumes the
+# exact pending action internally.
+#
+# This is intentionally narrower than "GitHub access": it covers only the
+# provider mutations currently implemented and verified by the GitHub adapter.
+
+policies:
+  - agent: agent-os-runtime
+    allow_tool:
+      - github.pull.merge
+      - github.issue.comment
+    approve_tool:
+      - github.pull.merge
+      - github.issue.comment
+    impact_max: write
+    data_domains:
+      - tk-ap/agent-os
+      - tk-ap/ledgato
+      - tk-ap/ALVIRA
+      - tk-ap/ailhat
+      - tk-ap/ashwood-info
+    on_deny:
+      - alert
+      - human_review
