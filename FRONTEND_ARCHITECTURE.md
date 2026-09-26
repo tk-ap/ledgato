@@ -92,26 +92,55 @@ Names may evolve, but the responsibilities should stay legible. Internal concept
 
 The default successful state should be quiet and legible, for example: no action required, governed actions completed automatically, verification status healthy. The console should demand attention only when an approval, drift, verification failure, or configuration problem requires the owner.
 
-## Authority interview UX
+## Progressive authority calibration UX
 
-The console should provide a guided authority interview for onboarding and later policy refinement.
+The console should support **progressive authority calibration**, not force users through a comprehensive permissions questionnaire before the product becomes useful.
 
-This is not a generic chat surface. Its primary purpose is to collect **explicit, structured authorization decisions** with minimal room for inference.
+The authority interview remains available as a structured question surface, but it serves three narrower jobs:
 
-UI requirements:
+1. **minimal onboarding calibration** for the few high-value defaults needed to begin safely;
+2. **contextual just-in-time decisions** when an agent reaches a consequential boundary not covered by standing policy;
+3. **policy refinement** when repeated approvals create enough evidence to propose a narrower standing rule.
 
-- default to close-ended controls: single-select, multi-select, toggles, bounded numeric inputs, named-resource selectors, and explicit conditional choices;
+### Onboarding
+
+Keep first-run calibration intentionally short. Establish the safe baseline, protect initial systems, and let the user leave the product.
+
+Do not require every agent/action/resource combination to be preconfigured before protection starts.
+
+### Contextual decisions
+
+When a real boundary is encountered, show the actual context already known:
+
+- agent/principal;
+- requested action;
+- protected system/resource;
+- environment;
+- consequence / impact;
+- requested scope;
+- expiry or task duration;
+- delegation implications when applicable.
+
+Default action choices should support scoped decisions such as **Allow once**, **Allow for this task**, **Allow until expiry**, **Allow under these conditions**, **Ask me each time**, and **Deny**.
+
+After an allowed decision, the originating agent workflow should be able to resume automatically.
+
+### Question controls
+
+This is not a generic chat surface. Use close-ended controls—single-select, multi-select, toggles, bounded numeric inputs, named-resource selectors, and explicit conditional choices—whenever consequential authority is being granted.
+
+Requirements:
+
 - show one consequential authority decision at a time;
-- always name the agent/principal, action, protected resource/environment, and condition when material;
 - do not preselect an authority-expanding answer from ALVIRA context;
 - ALVIRA-derived context may reorder, suppress, or propose questions, but any authority-expanding result requires an explicit user selection;
-- show a plain-language "this is what Ledgato will allow / require approval for / deny" review before policy activation;
-- distinguish proposed policy from active policy;
 - preserve unanswered/unknown states rather than filling gaps with inference;
-- provide an "Ask me each time" / approval-required path when the user does not want a standing grant;
-- let users revisit and amend prior answers without requiring them to edit YAML or raw policy documents.
+- show proposed policy separately from active policy;
+- before activation, summarize exactly what will become automatic, approval-required, or denied;
+- let users amend prior rules without editing YAML or raw policy;
+- repeated behavior may produce a policy suggestion, never an automatic authority expansion.
 
-The interview should produce typed policy inputs suitable for the engine rather than relying on an LLM-generated prose summary as the source of truth.
+The interview/calibration UI produces typed policy inputs suitable for the engine. An LLM-generated prose summary is explanatory only and cannot be the activated source of truth.
 
 ## Runtime-status contract
 
