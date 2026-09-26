@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-os.local/contracts/capability-manifest.schema.json",
+  "title": "Workforce Capability Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest_id", "work_id", "agents", "skills", "tools", "harness_candidates", "generated_at"],
+  "properties": {
+    "manifest_id": {"type": "string"},
+    "work_id": {"type": "string"},
+    "agents": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "skills": {"type": "array", "items": {"type": "string"}},
+    "tools": {"type": "array", "items": {"type": "string"}},
+    "resources": {"type": "array", "items": {"type": "string"}},
+    "harness_candidates": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "estimated_cost": {"type": "object"},
+    "generated_at": {"type": "string", "format": "date-time"}
+  }
+}

@@ -69,3 +69,7 @@ v0.3.0 is the enforcement **foundation and first-client proof slice**, not a cla
 
 - a native adapter whose credential is isolated behind the gateway; or
 - an equivalent non-bypassable enforcement point (for example, a required GitHub check or protected MCP server operation).
+
+## Mandatory checkpoint for executors outside Ledgato
+
+When the executor is not Ledgato's own gateway (for example AgentOS), the resource itself must refuse to act without Ledgato's say-so. `ENFORCEMENT_BOUNDARY_PROOF.md` documents one such boundary. It uses a narrow action contract, a single-use Ledgato-signed permit issued only on ALLOW, a protected resource that pins Ledgato's key, and an AgentOS-side `ProtectedExecutor` that fails closed. It also lists what remains before that pattern can be called production enforcement.

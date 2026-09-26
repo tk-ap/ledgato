@@ -1,0 +1,11 @@
+version: 0.1.0
+product: ledgato
+category: authorization-intelligence
+ecosystem_source: tk-ap/agent-os
+ecosystem_contract: ecosystem/ECOSYSTEM.md
+product_directive: products/ledgato.md
+owns: [authority-graph, policy-evaluation, approval, denial, runtime-enforcement, verification, attestation]
+produces: [authority-decision, authority-status, signed-evidence]
+consumes: [authority-request, capability-manifest, initiative-constraints, execution-evidence]
+must_not_own: [context-authorship, portfolio-priority, workforce-planning, harness-selection]
+

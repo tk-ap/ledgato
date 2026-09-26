@@ -7,11 +7,13 @@ post-action verification through registered native adapters.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
+import uuid
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from . import attestation as attest_ops
 from .adapters.base import EnforcementAdapter
@@ -33,6 +35,7 @@ from .campaign import (
 from .crypto import Signer
 from .distributed import Node
 from .engine import DENY, Decision, evaluate_action
+from .enforcement import ActionContract, ContractError, DecisionStore, EnforcementPoint
 from .gate import attest_release
 from .gateway import EnforcementGateway
 from .idempotency import IdempotencyStore
@@ -66,6 +69,81 @@ class AttestRequest(BaseModel):
     actions: list[ActionIn] = Field(default_factory=list)
     observed_scope: Optional[list[str]] = None
     drift: bool = False
+
+
+class ContractModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class AuthorityRequester(ContractModel):
+    agent: str
+    identity: str
+
+
+class AuthorityRequest(ContractModel):
+    request_id: str
+    work_id: str
+    requester: AuthorityRequester
+    actions: list[str] = Field(min_length=1)
+    resources: list[str] = Field(min_length=1)
+    data_classes: list[str] = Field(default_factory=list)
+    network_destinations: list[str] = Field(default_factory=list)
+    constraints: dict[str, Any]
+    requested_at: datetime
+
+
+class CapabilityManifest(ContractModel):
+    manifest_id: str
+    work_id: str
+    agents: list[str] = Field(min_length=1)
+    skills: list[str]
+    tools: list[str]
+    resources: list[str] = Field(default_factory=list)
+    harness_candidates: list[str] = Field(min_length=1)
+    estimated_cost: dict[str, Any] = Field(default_factory=dict)
+    generated_at: datetime
+
+
+class AuthorityResolveRequest(ContractModel):
+    authority_request: AuthorityRequest
+    capability_manifest: CapabilityManifest
+
+
+class AuthorityEvidence(BaseModel):
+    ledger_entry_id: str
+    ledger_hash: str
+    signature: str
+    public_key: str
+
+
+class AuthorityDecision(BaseModel):
+    decision_id: str
+    request_id: str
+    work_id: str
+    outcome: Literal["allow", "deny", "approval_required"]
+    reasons: list[str]
+    policy: str
+    evaluated_actions: int
+    decided_at: datetime
+    evidence: AuthorityEvidence
+
+
+class AuthorityStatus(BaseModel):
+    work_id: str
+    state: Literal["authorized", "blocked", "awaiting_approval"]
+    decision_id: str
+    updated_at: datetime
+    evidence_hash: str
+
+
+class EnforcementDecideRequest(BaseModel):
+    contract: dict[str, Any]
+
+
+class EnforcementOutcomeRequest(BaseModel):
+    status: Optional[str] = None
+    executed: bool
+    receipt: Optional[dict[str, Any]] = None
 
 
 class AttestVerifyIn(BaseModel):
@@ -162,6 +240,7 @@ def create_app(
     approvals_path: str | Path | None = "approvals.json",
     idempotency_path: str | Path | None = "idempotency.json",
     campaigns_path: str | Path | None = "campaigns.json",
+    decisions_path: str | Path | None = "decisions.json",
     api_key: str | None = None,
     principals: PrincipalRegistry | None = None,
     require_auth: bool = True,
@@ -183,6 +262,7 @@ def create_app(
     if Path(ledger_path).exists():
         ledger = Ledger.load(ledger_path, signer=signer)
         ledger.difficulty = int(difficulty)
+    authority_statuses: dict[str, AuthorityStatus] = {}
 
     authority = AuthorityStore(authority_path)
     approvals = ApprovalStore(approvals_path)
@@ -206,6 +286,13 @@ def create_app(
     app.state.idempotency = idempotency
     app.state.campaigns = campaigns
     app.state.adapters = registered_adapters
+    enforcement = EnforcementPoint(
+        policies=policies,
+        ledger=ledger,
+        signer=signer,
+        store=DecisionStore(decisions_path),
+    )
+    app.state.enforcement = enforcement
 
     configured_key = api_key or os.getenv("LEDGATO_API_KEY")
     registry = principals if principals is not None else PrincipalRegistry.from_env()
@@ -300,6 +387,94 @@ def create_app(
         )
         return {"agent": req.agent, **decision.to_dict()}
 
+    @app.post("/v1/authority/resolve", response_model=AuthorityDecision, dependencies=[Depends(_auth)])
+    def resolve_authority(req: AuthorityResolveRequest):
+        """Resolve an Agent OS authority request before a harness executes work."""
+        request = req.authority_request
+        manifest = req.capability_manifest
+        policy = _policy(request.requester.agent)
+        reasons: list[str] = []
+
+        if request.work_id != manifest.work_id:
+            reasons.append("authority request and capability manifest refer to different work")
+        if request.requester.agent not in manifest.agents:
+            reasons.append("requesting agent is not present in the capability manifest")
+
+        missing_actions = sorted(set(request.actions) - set(manifest.tools))
+        if missing_actions:
+            reasons.append(f"requested actions are absent from the capability manifest: {missing_actions}")
+        missing_resources = sorted(set(request.resources) - set(manifest.resources))
+        if missing_resources:
+            reasons.append(f"requested resources are absent from the capability manifest: {missing_resources}")
+
+        impact = str(request.constraints.get("impact", "readonly"))
+        intent = request.constraints.get("intent")
+        action_decisions = []
+        if not reasons:
+            for tool in request.actions:
+                for resource in request.resources:
+                    decision = evaluate_action(
+                        policy,
+                        Action(tool=tool, domain=resource, impact=impact, intent=intent),
+                    )
+                    action_decisions.append(decision)
+                    reasons.extend(decision.reasons)
+
+        denied = bool(reasons and not action_decisions) or any(not item.allow for item in action_decisions)
+        approval_on_deny = bool({"approve", "approval", "require_approval"} & set(policy.on_deny))
+        outcome = "approval_required" if denied and approval_on_deny else "deny" if denied else "allow"
+        evidence_body = {
+            "request_id": request.request_id,
+            "work_id": request.work_id,
+            "manifest_id": manifest.manifest_id,
+            "identity": request.requester.identity,
+            "outcome": outcome,
+            "reasons": reasons,
+            "actions": request.actions,
+            "resources": request.resources,
+        }
+        entry = ledger.append(
+            request.requester.agent,
+            outcome.upper(),
+            evidence_body,
+            action="authority.resolve",
+        )
+        resolved = AuthorityDecision(
+            decision_id=uuid.uuid4().hex,
+            request_id=request.request_id,
+            work_id=request.work_id,
+            outcome=outcome,
+            reasons=reasons,
+            policy=policy.agent,
+            evaluated_actions=len(action_decisions),
+            decided_at=datetime.now(timezone.utc),
+            evidence=AuthorityEvidence(
+                ledger_entry_id=entry.id,
+                ledger_hash=entry.hash,
+                signature=entry.signature,
+                public_key=entry.public_key,
+            ),
+        )
+        authority_statuses[request.work_id] = AuthorityStatus(
+            work_id=request.work_id,
+            state={
+                "allow": "authorized",
+                "deny": "blocked",
+                "approval_required": "awaiting_approval",
+            }[outcome],
+            decision_id=resolved.decision_id,
+            updated_at=resolved.decided_at,
+            evidence_hash=entry.hash,
+        )
+        return resolved
+
+    @app.get("/v1/authority/status/{work_id}", response_model=AuthorityStatus, dependencies=[Depends(_auth)])
+    def authority_status(work_id: str):
+        status = authority_statuses.get(work_id)
+        if not status:
+            raise HTTPException(404, f"no authority decision for work '{work_id}'")
+        return status
+
     @app.post("/v1/discovery", dependencies=[Depends(_auth)])
     def discovery(req: DiscoveryRequest):
         try:
@@ -308,6 +483,48 @@ def create_app(
             raise HTTPException(404, str(exc)) from exc
         except Exception as exc:
             raise HTTPException(502, f"live discovery failed: {exc}") from exc
+
+    # ---- mandatory checkpoint: contract → decision → permit --------------
+    @app.get("/v1/enforcement/public-key", dependencies=[Depends(_auth)])
+    def enforcement_public_key():
+        return {"public_key": enforcement.public_key()}
+
+    @app.post("/v1/enforcement/decide")
+    def enforcement_decide(req: EnforcementDecideRequest, principal: Principal = Depends(_principal)):
+        # IAM identifies: the contract's agent must be the authenticated agent.
+        # A human, admin, or verifier credential cannot obtain a permit.
+        if principal.is_verifier():
+            raise HTTPException(403, f"verifier principal '{principal.id}' may not request permits")
+        _require_role(principal, allowed={"agent"}, action="request enforcement decisions")
+        try:
+            contract = ActionContract.from_dict(req.contract)
+        except ContractError as exc:
+            raise HTTPException(422, f"invalid action contract: {exc}") from exc
+        _claim(principal, contract.agent_id, field="contract.agent.id")
+        return enforcement.decide(contract, principal_id=principal.id)
+
+    @app.post("/v1/enforcement/decisions/{decision_id}/outcome")
+    def enforcement_outcome(
+        decision_id: str, req: EnforcementOutcomeRequest, principal: Principal = Depends(_principal)
+    ):
+        _require_role(principal, allowed={"agent"}, action="report enforcement outcomes")
+        try:
+            return enforcement.record_outcome(
+                decision_id, req.model_dump(), principal_id=principal.id
+            )
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.get("/v1/enforcement/decisions/{decision_id}/evidence", dependencies=[Depends(_auth)])
+    def enforcement_evidence(decision_id: str):
+        try:
+            return enforcement.evidence(decision_id)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
 
     @app.post("/v1/gateway/execute")
     def gateway_execute(req: GatewayRequest, principal: Principal = Depends(_principal)):

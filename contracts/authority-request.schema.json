@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-os.local/contracts/authority-request.schema.json",
+  "title": "Ledgato Authority Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "work_id", "requester", "actions", "resources", "constraints", "requested_at"],
+  "properties": {
+    "request_id": {"type": "string"},
+    "work_id": {"type": "string"},
+    "requester": {"type": "object", "required": ["agent", "identity"], "properties": {"agent": {"type": "string"}, "identity": {"type": "string"}}, "additionalProperties": false},
+    "actions": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "resources": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "data_classes": {"type": "array", "items": {"type": "string"}},
+    "network_destinations": {"type": "array", "items": {"type": "string"}},
+    "constraints": {"type": "object"},
+    "requested_at": {"type": "string", "format": "date-time"}
+  }
+}
