@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "httpx>=0.24"]
+x402 = ["x402[requests,evm]>=2.24,<3"]
 
 [project.scripts]
 ledgato = "ledgato.cli:main"

@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from . import attestation as attest_ops
 from .adapters.base import EnforcementAdapter
 from .adapters.github import GitHubAdapter
+from .adapters.x402 import X402Adapter
 from .approvals import ApprovalStore
 from .principals import (
     IdentityClaimError,
@@ -792,6 +793,36 @@ def _default_adapters_from_env() -> dict[str, EnforcementAdapter]:
             repository=repository,
             token=token,
             api_url=os.getenv("LEDGATO_GITHUB_API_URL"),
+        )
+
+    x402_private_key = os.getenv("LEDGATO_X402_EVM_PRIVATE_KEY")
+    if x402_private_key:
+        allowed_hosts = [
+            value.strip()
+            for value in (os.getenv("LEDGATO_X402_ALLOWED_HOSTS") or "").split(",")
+            if value.strip()
+        ]
+        networks = [
+            value.strip()
+            for value in (os.getenv("LEDGATO_X402_NETWORKS") or "").split(",")
+            if value.strip()
+        ]
+        if not allowed_hosts:
+            raise RuntimeError(
+                "LEDGATO_X402_ALLOWED_HOSTS is required when x402 is enabled"
+            )
+        if not networks:
+            raise RuntimeError(
+                "LEDGATO_X402_NETWORKS is required when x402 is enabled"
+            )
+        adapters["x402"] = X402Adapter.from_evm_private_key(
+            private_key=x402_private_key,
+            allowed_hosts=allowed_hosts,
+            networks=networks,
+            max_amount_per_payment=os.getenv(
+                "LEDGATO_X402_MAX_AMOUNT_PER_PAYMENT", "$0.10"
+            ),
+            timeout_seconds=float(os.getenv("LEDGATO_X402_TIMEOUT_SECONDS", "30")),
         )
     return adapters
 
