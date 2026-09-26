@@ -239,3 +239,55 @@ def test_approve_and_resume_keeps_token_server_side_and_executes_once(pieces):
             jit_ttl_seconds=60,
         )
     assert adapter.executions == 1
+
+
+def test_approve_and_resume_recovers_after_approval_before_resume(pieces):
+    adapter, _, _, _ = pieces
+    gateway = build_gateway(
+        pieces,
+        Policy(
+            agent="agent",
+            allow_tools={"fake.risky"},
+            impact_max="destructive",
+            approval_tools={"fake.risky"},
+        ),
+    )
+
+    pending = gateway.execute(
+        agent="agent",
+        adapter="fake",
+        action=Action(tool="fake.risky", impact="destructive"),
+        task_id="task-recover",
+        requested_by="agent-os",
+    )
+    approval_id = pending["approval"]["id"]
+
+    # Simulate a process/request interruption after the approval was committed
+    # but before the resume token was consumed.
+    gateway.approve(
+        approval_id,
+        decided_by="owner",
+        reason="owner selected Allow once",
+        jit_ttl_seconds=60,
+    )
+    assert adapter.executions == 0
+
+    recovered = gateway.approve_and_resume(
+        approval_id,
+        decided_by="owner",
+        reason="retry same owner decision",
+        jit_ttl_seconds=60,
+    )
+    assert recovered["execution"]["status"] == "ALLOW"
+    assert recovered["execution"]["executed"] is True
+    assert recovered["execution"]["verification"]["verified"] is True
+    assert adapter.executions == 1
+
+    with pytest.raises(ValueError):
+        gateway.approve_and_resume(
+            approval_id,
+            decided_by="owner",
+            reason="retry after consume",
+            jit_ttl_seconds=60,
+        )
+    assert adapter.executions == 1
