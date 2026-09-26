@@ -70,6 +70,14 @@ Preserve these rules:
 - repeated approvals may generate a proposed standing rule, but must never silently broaden active policy;
 - the activated source of truth is structured authority produced from explicit answers, not an LLM prose interpretation.
 
+## Jev Pre-Decision Guardrail
+
+For Jev-related work, read `JEV_PREDECISION_BOOTSTRAP.md` and the Jev section of `PRODUCT_DIRECTION.md`.
+
+Jev is advisory pre-decision intelligence only. It may classify requests, match candidate policy, detect novelty, identify missing authority dimensions, select minimal contextual questions, and propose narrow rule refinements. It may not grant authority, issue permits, activate policy, or return the authoritative enforcement decision.
+
+Do not promote Jev into a live enforcement path until its benchmark is run and the architecture preserves a deterministic Ledgato policy decision between Jev output and execution.
+
 ## Protocol Adapter Direction
 
 For MCP, A2A, x402, AP2, UCP, Visa TAP, AP4M, or other agent-protocol integration work, read the protocol-integration section of `PRODUCT_DIRECTION.md` before planning or implementation.
