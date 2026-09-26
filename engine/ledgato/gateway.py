@@ -128,6 +128,7 @@ class EnforcementGateway:
                 grant_id=grant_id,
                 requested_by=requested_by,
                 campaign_context=campaign_context,
+                decision_context=decision.to_dict(),
             )
             evidence = {
                 **base_evidence,

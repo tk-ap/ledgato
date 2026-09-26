@@ -217,3 +217,80 @@ def test_gateway_api_idempotency_survives_service_recreation(tmp_path):
     assert replay.json()["idempotent_replay"] is True
     assert replay.json()["attestation_id"] == original.json()["attestation_id"]
     assert second_adapter.executions == []
+
+
+
+def test_decision_prompt_is_channel_neutral_redacted_and_bound_to_exact_action(setup):
+    client, adapter = setup
+    pending = client.post(
+        "/v1/gateway/execute",
+        headers=headers(),
+        json={
+            "agent": "ops-agent",
+            "adapter": "fake",
+            "task_id": "t-prompt",
+            "requested_by": "agent-os",
+            "action": {
+                "tool": "fake.risky",
+                "domain": "prod::billing",
+                "impact": "destructive",
+                "intent": "perform one bounded operation",
+                "params": {"record_id": "42", "api_token": "never-render-me"},
+            },
+        },
+    )
+    assert pending.status_code == 200
+    assert pending.json()["status"] == "APPROVE"
+    assert adapter.executions == []
+
+    prompts = client.get("/v1/decision-prompts?status=PENDING", headers=approver_headers())
+    assert prompts.status_code == 200
+    prompt = next(row for row in prompts.json()["prompts"] if row["task_id"] == "t-prompt")
+    assert prompt["version"] == "ledgato.decision-prompt/v1"
+    assert prompt["boundary"]["adapter"] == "fake"
+    assert prompt["boundary"]["resource"] == "prod::billing"
+    assert prompt["requested_action"]["tool"] == "fake.risky"
+    facts = {row["key"]: row for row in prompt["requested_action"]["facts"]}
+    assert facts["record_id"]["value"] == "42"
+    assert facts["api_token"]["value"] == "[redacted]"
+    assert "never-render-me" not in str(prompt)
+    assert [choice["id"] for choice in prompt["choices"]] == ["allow_once", "deny", "inspect"]
+    assert len(prompt["contract_digest"]) == 64
+
+    detail = client.get(f"/v1/decision-prompts/{prompt['decision_id']}", headers=approver_headers())
+    assert detail.status_code == 200
+    assert detail.json()["contract_digest"] == prompt["contract_digest"]
+
+    agent_read = client.get("/v1/decision-prompts?status=PENDING", headers=headers())
+    assert agent_read.status_code == 403
+
+
+def test_allow_once_from_prompt_resumes_exact_pending_action(setup):
+    client, adapter = setup
+    pending = client.post(
+        "/v1/gateway/execute",
+        headers=headers(),
+        json={
+            "agent": "ops-agent",
+            "adapter": "fake",
+            "task_id": "t-inline",
+            "action": {"tool": "fake.risky", "domain": "prod::billing", "impact": "destructive"},
+        },
+    ).json()
+    approval_id = pending["approval"]["id"]
+    prompt = client.get(f"/v1/decision-prompts/{approval_id}", headers=approver_headers()).json()
+
+    result = client.post(
+        f"/v1/approvals/{approval_id}/approve-and-resume",
+        headers=approver_headers(),
+        json={
+            "decided_by": "owner",
+            "reason": f"Allow once from inline prompt {prompt['contract_digest'][:12]}",
+            "jit_ttl_seconds": 60,
+        },
+    )
+    assert result.status_code == 200
+    assert result.json()["execution"]["status"] == "ALLOW"
+    assert result.json()["execution"]["executed"] is True
+    assert result.json()["execution"]["verification"]["verified"] is True
+    assert adapter.executions == ["fake.risky"]

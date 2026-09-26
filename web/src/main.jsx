@@ -241,13 +241,18 @@ function AppShell({path}){const title=useMemo(()=>appRoutes.find(([p])=>p===path
 
 
 function actionLabel(approval){
+  const prompt=approval?.prompt
   const action=approval?.action||{}
   return {
-    tool:action.tool||'Unknown consequential action',
-    resource:action.domain||'Unspecified resource',
-    impact:action.impact||'unknown',
-    task:approval?.task_id||'No task id',
-    agent:approval?.agent||'Unknown agent'
+    tool:prompt?.requested_action?.tool||action.tool||'Unknown consequential action',
+    resource:prompt?.requested_action?.resource||action.domain||'Unspecified resource',
+    impact:prompt?.requested_action?.impact||action.impact||'unknown',
+    task:prompt?.task_id||approval?.task_id||'No task id',
+    agent:prompt?.agent||approval?.agent||'Unknown agent',
+    reason:prompt?.why_held||'This consequential action requires an explicit scoped decision.',
+    consequence:prompt?.consequence||'Nothing downstream has happened yet.',
+    digest:prompt?.contract_digest||null,
+    facts:Array.isArray(prompt?.requested_action?.facts)?prompt.requested_action.facts:[],
   }
 }
 
@@ -321,12 +326,13 @@ function ProgressiveAuthorityPanel(){
       <div className="authorityPromptMain">
         <span className="plainDecision approval">Waiting for you</span>
         <h3>{info.agent} wants to perform <code>{info.tool}</code>.</h3>
-        <p>This request is paused. Nothing downstream should happen until you make an explicit scoped decision.</p>
+        <p>{info.reason} {info.consequence} Nothing downstream has happened yet.</p>
+        {info.facts.length>0&&<div className="authorityPromptFacts">{info.facts.map(f=><span key={f.key}><b>{f.key}</b> {f.value}</span>)}</div>}
         <div className="authorityFacts">
           <div><small>RESOURCE</small><strong>{info.resource}</strong></div>
           <div><small>IMPACT</small><strong>{info.impact}</strong></div>
           <div><small>TASK</small><strong>{info.task}</strong></div>
-          <div><small>SCOPE</small><strong>this exact pending action</strong></div>
+          <div><small>SCOPE</small><strong>this exact pending action{info.digest?<><br/><code>{info.digest.slice(0,12)}</code></>:null}</strong></div>
         </div>
       </div>
       <div className="authorityDecision">

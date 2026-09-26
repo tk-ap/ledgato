@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/decision-prompt.schema.json",
+  "title": "LEDGATo Decision Prompt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "decision_id",
+    "contract_digest",
+    "agent",
+    "requested_at",
+    "boundary",
+    "requested_action",
+    "why_held",
+    "consequence",
+    "state",
+    "choices"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.decision-prompt/v1"
+    },
+    "decision_id": {
+      "type": "string",
+      "pattern": "^approval_[A-Za-z0-9_-]+$"
+    },
+    "contract_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "resource",
+        "protected_action"
+      ],
+      "properties": {
+        "adapter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protected_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "requested_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "resource",
+        "impact",
+        "facts",
+        "parameters_digest"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "facts": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "value",
+              "redacted"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "redacted": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "parameters_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "why_held": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consequence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "choices": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "effect"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "allow_once",
+              "deny",
+              "inspect"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "decision",
+              "information"
+            ]
+          },
+          "effect": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
