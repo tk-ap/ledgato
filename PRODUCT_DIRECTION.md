@@ -309,9 +309,84 @@ The product should be understandable as:
 
 The website should communicate that the value happens while the user is **not** in Ledgato. The product is not "another AI dashboard"; the dashboard exists so the human can understand and control an otherwise autonomous enforcement system.
 
-## Authority interview: explicit answers, deterministic policy
+## Progressive Authority Calibration
 
-Ledgato should include a specialized authority-interview experience powered by ALVIRA's interview capability, but optimized for **low-ambiguity enforcement decisions** rather than open-ended profile capture.
+Ledgato should not depend on a comprehensive upfront permissions interview. The authority interview is a **bootstrap and exception-resolution component** inside a broader progressive calibration model.
+
+The operating pattern is:
+
+```text
+connect agent/runtime + protected systems
+        ↓
+discover available principals / actions / resources
+        ↓
+establish a minimal safe baseline
+        ↓
+short initial calibration for high-value boundaries only
+        ↓
+agent works autonomously
+        ↓
+new consequential boundary is encountered
+        ↓
+ask a precise contextual authority question
+        ↓
+explicit scoped decision
+        ↓
+typed authority record / permit / policy
+        ↓
+agent resumes automatically when allowed
+        ↓
+verify outcome + expire / revoke as applicable
+        ↓
+observe repeated decisions
+        ↓
+propose narrower standing rule for explicit confirmation
+```
+
+This model reduces the need for users to predict every future agent behavior during onboarding while preserving explicit authority.
+
+### Safe baseline
+
+Unknown consequential authority must not silently default to broad autonomy.
+
+For unresolved boundaries, policy should resolve to an explicit safe state such as:
+
+- `DENY`; or
+- `APPROVE` / ask the owner when the action is legitimate but not yet covered by standing authority.
+
+The exact default may be configurable, but an unanswered authority dimension must never expand authority.
+
+### Initial calibration
+
+Onboarding should ask only the small set of questions needed to establish a useful starting envelope, such as:
+
+- how unknown consequential actions should be handled;
+- whether reversible development actions may run autonomously;
+- whether production changes require approval initially;
+- whether autonomous monetary authority begins at zero or a bounded threshold;
+- whether agents may delegate any authority;
+- which connected systems should be protected first.
+
+The goal is not completeness. It is enough declared authority for the agent to begin useful autonomous work safely.
+
+### Contextual just-in-time authority
+
+When the runtime encounters a consequential action not covered by standing policy, Ledgato should ask about the **actual requested action**, with the principal, resource, consequence, scope, and duration already known.
+
+Prefer choices such as:
+
+- **Allow once**
+- **Allow for this task**
+- **Allow until [time / expiry]**
+- **Allow automatically under these stated conditions**
+- **Ask me each time**
+- **Deny**
+
+A valid scoped approval should allow the paused agent workflow to resume automatically without requiring the owner to operate Ledgato as a workspace.
+
+### Low-ambiguity question contract
+
+The contextual question itself should remain concise, close-ended, and typed.
 
 The division of responsibility is:
 
@@ -323,47 +398,66 @@ Core rule:
 
 > **Context may reduce the number of questions. Context may not answer an authority question on the user's behalf.**
 
-The default interaction should use concise, close-ended questions that map directly to typed policy fields. Prefer single-select, multi-select, bounded numeric thresholds, named-resource pickers, and explicit conditional choices over free text.
-
-Each question should identify, where applicable:
+Each consequential question should identify, where applicable:
 
 - principal / agent;
 - action;
 - resource or environment;
 - condition;
+- requested scope;
+- expiry / duration;
+- delegation behavior;
 - authority decision being requested;
 - response type;
 - resulting policy field(s).
 
-Example shape:
-
-```text
-subject: Claude Code
-action: deploy
-resource: production
-condition: required checks passed
-decision_requested: autonomous_authority
-response_type: single_select
-```
-
 Question-design rules:
 
 - ask one consequential decision at a time;
-- prefer `Yes / No / Conditional / Ask me` or similarly bounded choices;
 - make the consequence explicit, such as "production deployment" rather than "deploy";
 - separate read, write, delete, spend, publish, delegate, approve, and credential access where those distinctions matter;
 - never infer permission from tone, preference, past context, or prior approval of a different action;
-- unanswered authority defaults must not expand authority;
+- prefer structured choices, bounded numeric thresholds, named-resource selectors, and explicit conditions over free text;
 - free text may collect labels, named resources, rationales, or custom thresholds, but should not be the primary mechanism for granting consequential authority;
-- before activation, show the resulting authority envelope back to the user in plain language for explicit confirmation.
+- preserve an explicit unknown/unresolved state instead of filling policy gaps with model inference.
 
-The output is **deterministic policy, not conversational inference**.
+### Deterministic authority records
 
-This interview can be used during onboarding and later when the system detects an unresolved authority dimension, a newly connected integration, delegation capability, spending rail, drift condition, or repeated approval pattern. Repeated approvals may justify proposing a narrower standing rule, but the proposal must still require explicit confirmation before authority changes.
+The source of truth is a typed authority record, not conversational prose.
 
-A useful onboarding sequence is:
+A grant should be capable of representing at least:
 
-**Connect → Interview → Review authority envelope → Confirm → Protect**
+```text
+principal
+action
+resource
+conditions
+scope
+duration / expiry
+delegation rule
+decision
+authority provenance
+```
+
+Before a standing rule becomes active, show its effect in plain language: what Ledgato will allow automatically, what still requires approval, and what remains denied.
+
+### Explicit refinement, never silent authority learning
+
+Ledgato may learn **what policy to propose**, but it must not learn itself into broader authority.
+
+Repeated approvals or recurring patterns may trigger a suggestion such as:
+
+> You have approved this same preview deployment under the same conditions repeatedly. Keep asking, allow automatically under these conditions, or customize?
+
+The existing policy remains in force until the user explicitly confirms a replacement or extension.
+
+A concise product description is:
+
+> **You do not need to predict everything your agent might do. Ledgato asks when a new boundary actually matters, records the rule you choose, and gets out of the way next time.**
+
+A useful first-run sequence is therefore:
+
+**Connect → Minimal calibration → Protect → Calibrate in context**
 
 ## Embedded experience
 
