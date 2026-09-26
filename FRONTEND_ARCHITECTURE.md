@@ -58,6 +58,40 @@ Own authentication entry points and guest-demo entry. Preserve current visual la
 
 Owns the browser control-plane experience. UI must consume a typed runtime-status contract instead of embedding assumptions about Python availability in route copy.
 
+## Authenticated console charter
+
+The authenticated site is a **control room for autonomous enforcement**, not a workspace the user must keep open and not the mechanism that activates Ledgato.
+
+Core invariant:
+
+> **Closing the Ledgato tab must not weaken, disable, or pause an already configured enforcement boundary.**
+
+The console should answer these owner questions before exposing internal implementation terminology:
+
+1. **Is everything under control?** — current protected-boundary health, runtime availability, and anything requiring attention.
+2. **What can each agent do?** — understandable authority envelopes: allowed, approval-required, and denied.
+3. **What systems are actually protected?** — integrations where Ledgato is in the real execution path, with evidence state clearly distinguished from configured-only connections.
+4. **Does anything need me?** — pending approvals or unresolved drift, with scoped approve/deny actions.
+5. **What actually happened?** — activity and evidence showing attempted action, decision, execution result, downstream verification, and bypass/drift status.
+6. **How do I change the rules?** — policy and authority configuration.
+7. **How do I protect another boundary?** — integrations/onboarding for adapters, SDKs, gateways, and supported protocols.
+
+Preferred authenticated information architecture:
+
+```text
+Overview
+Agents
+Protected Systems
+Approvals
+Activity / Evidence
+Policies
+Integrations
+```
+
+Names may evolve, but the responsibilities should stay legible. Internal concepts such as PEART, permit formats, policy-engine internals, or raw authority-resolution structures belong behind progressive disclosure rather than as the primary overview.
+
+The default successful state should be quiet and legible, for example: no action required, governed actions completed automatically, verification status healthy. The console should demand attention only when an approval, drift, verification failure, or configuration problem requires the owner.
+
 ## Runtime-status contract
 
 The frontend must receive or derive exactly one of these presentation states:
