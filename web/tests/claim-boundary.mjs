@@ -8,7 +8,9 @@ const banned=[
   ['If it can reach your stack','Ledgato can see it'].join(', '),
   ['Anything that escapes, drifts, or exfiltrates','is caught and blocked before release'].join(' '),
   ['LIVE · ENFORCING','POLICY'].join(' '),
-  ['REAL · ALVIRA','ENGINE-DERIVED'].join(' · ')
+  ['REAL · ALVIRA','ENGINE-DERIVED'].join(' · '),
+  // Ledgato is governance/enforcement; Agent OS is the control plane (agent-os registry).
+  ['AUTHORIZATION','CONTROL PLANE'].join(' ')
 ]
 for(const phrase of banned){
   if(text.includes(phrase)) throw new Error(`Universal/live claim reintroduced: ${phrase}`)

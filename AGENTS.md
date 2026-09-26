@@ -9,7 +9,7 @@ LEDGATo is not the generic workforce router and should not absorb every sensitiv
 ### Boundary
 
 - Agent OS / Workforce owns shared workforce composition, task resolution, agents, skills, handoffs, workflows, host/harness selection, and execution semantics.
-- Agent Control owns generic authorization intelligence where integrated: whether an action is allowed, denied, scoped, or requires human approval.
+- Agent Control is the authorization-intelligence **role** inside the Agent OS control plane (not a separate product or repository): deciding whether an action is allowed, denied, scoped, or requires human approval. At the boundaries LEDGATo enforces, LEDGATo's decision engine fills that role; elsewhere, Agent OS applies its static autonomy policy. LEDGATo does not become the ecosystem-wide owner of every authorization question.
 - ALVIRA / MeOS owns Context Intelligence.
 - ailhat owns Portfolio Intelligence and may propose evidence-backed work.
 - LEDGATo owns governance/enforcement behavior and evidence only where that behavior is actually implemented and relevant.
