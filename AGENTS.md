@@ -55,18 +55,20 @@ Before material authenticated-frontend work, read `FRONTEND_ARCHITECTURE.md` and
 
 A skill/prompt may help an agent understand Ledgato responses, but it is not an enforcement boundary. Prefer adapters, SDK/gateway hooks, or other execution-path controls that the agent cannot simply reason around.
 
-## Authority Interview Guardrail
+## Progressive Authority Calibration Guardrail
 
-When designing or implementing onboarding, authority configuration, approval learning, or policy refinement, read the authority-interview section of `PRODUCT_DIRECTION.md`.
+When designing or implementing onboarding, authority configuration, approval learning, or policy refinement, read the Progressive Authority Calibration section of `PRODUCT_DIRECTION.md`.
 
 Preserve these rules:
 
+- do not require a comprehensive upfront authority interview when a minimal safe baseline plus contextual decisions can resolve authority more accurately;
 - ALVIRA/context may decide what to ask, not what authority to grant;
 - use close-ended, typed questions for consequential authority whenever possible;
-- do not infer permission from user preference, conversational tone, historical context, or a different prior approval;
-- unanswered authority must not expand authority;
-- proposals derived from repeated approvals, context, or observed behavior require explicit confirmation before policy changes;
-- the activated source of truth is structured policy produced from explicit answers, not an LLM prose interpretation.
+- unknown/unanswered consequential authority must not expand authority;
+- contextual approvals should be scoped by principal, action, resource, conditions, duration/expiry, and delegation where applicable;
+- valid approval/resume should return control to the originating autonomous workflow rather than requiring the user to operate Ledgato continuously;
+- repeated approvals may generate a proposed standing rule, but must never silently broaden active policy;
+- the activated source of truth is structured authority produced from explicit answers, not an LLM prose interpretation.
 
 ## Protocol Adapter Direction
 
