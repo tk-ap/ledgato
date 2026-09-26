@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0b"/>
+  <circle cx="930" cy="315" r="150" fill="none" stroke="#6d28d9" stroke-width="6" opacity=".32"/>
+  <circle cx="930" cy="315" r="110" fill="none" stroke="#8b5cf6" stroke-width="8" opacity=".58"/>
+  <circle cx="930" cy="315" r="70" fill="none" stroke="#a78bfa" stroke-width="10"/>
+  <text x="82" y="135" fill="#ededf0" font-family="Inter,Arial,sans-serif" font-size="70" font-weight="700">LEDGATo</text>
+  <text x="82" y="218" fill="#c7c7cf" font-family="Inter,Arial,sans-serif" font-size="34">Independent authorization for</text>
+  <text x="82" y="263" fill="#c7c7cf" font-family="Inter,Arial,sans-serif" font-size="34">consequential AI actions.</text>
+  <text x="82" y="390" fill="#a78bfa" font-family="monospace" font-size="24" font-weight="700">CHECK AUTHORITY · ENFORCE · VERIFY · PROVE</text>
+  <text x="82" y="530" fill="#8c8c96" font-family="Inter,Arial,sans-serif" font-size="28">ledgato.vercel.app</text>
+</svg>
