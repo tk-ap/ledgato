@@ -72,3 +72,20 @@
 .hiwOut h3{margin:8px 0 0;font-size:24px;letter-spacing:-.02em}
 .hiwOut p{margin:6px 0 0;color:rgba(255,255,255,.58)}
 @media(max-width:900px){.flow{grid-template-columns:1fr}.flow .fstep:not(:last-child)::after{right:auto;left:50%;top:auto;bottom:-9px;transform:translateX(-50%) rotate(90deg)}.layers3,.persp{grid-template-columns:1fr}.hiwHero{padding-top:56px}}
+
+
+/* --- public navigation + owner access --- */
+.publicFooter{display:grid;grid-template-columns:auto 1fr;gap:18px 32px;align-items:center}
+.footerNav{display:flex;justify-content:flex-end;gap:18px;flex-wrap:wrap}
+.footerNav a{font:10px 'JetBrains Mono';letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.58)}
+.footerNav a:hover,.authBack:hover{color:var(--electricSoft)}
+.footerNote{grid-column:1/-1;color:rgba(255,255,255,.45);font-size:13px;margin:0}
+.accessPanel h3{font-size:28px;margin:12px 0}
+.accessPanel p{color:rgba(255,255,255,.62);line-height:1.65}
+.accessPanel small{display:block;margin-top:14px;color:rgba(255,255,255,.42);font:10px 'JetBrains Mono';line-height:1.6}
+.accessLink{display:block;text-align:center;margin-top:24px}
+.authCard label{display:block;margin-top:14px;font:10px 'JetBrains Mono';letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.52)}
+.authCard button:disabled{opacity:.6;cursor:wait}
+.authStatus{border-left:2px solid var(--amber);padding:10px 12px;margin-top:18px;background:rgba(240,184,76,.06)}
+.authBack{display:inline-block;margin-top:24px;color:rgba(255,255,255,.62);font:11px 'JetBrains Mono';letter-spacing:.08em}
+@media(max-width:700px){.publicFooter{grid-template-columns:1fr}.footerNav{justify-content:flex-start}.footerNote{grid-column:auto}}
