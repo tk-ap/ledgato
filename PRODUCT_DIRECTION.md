@@ -309,6 +309,62 @@ The product should be understandable as:
 
 The website should communicate that the value happens while the user is **not** in Ledgato. The product is not "another AI dashboard"; the dashboard exists so the human can understand and control an otherwise autonomous enforcement system.
 
+## Authority interview: explicit answers, deterministic policy
+
+Ledgato should include a specialized authority-interview experience powered by ALVIRA's interview capability, but optimized for **low-ambiguity enforcement decisions** rather than open-ended profile capture.
+
+The division of responsibility is:
+
+- **ALVIRA** may supply relevant context and help prioritize which authority questions are worth asking;
+- **Ledgato** owns the authority questions, structured answers, resulting enforcement profile, confirmation, and policy activation;
+- **context may suggest a question or proposed rule, but context must never silently answer an authority question or grant authority.**
+
+Core rule:
+
+> **Context may reduce the number of questions. Context may not answer an authority question on the user's behalf.**
+
+The default interaction should use concise, close-ended questions that map directly to typed policy fields. Prefer single-select, multi-select, bounded numeric thresholds, named-resource pickers, and explicit conditional choices over free text.
+
+Each question should identify, where applicable:
+
+- principal / agent;
+- action;
+- resource or environment;
+- condition;
+- authority decision being requested;
+- response type;
+- resulting policy field(s).
+
+Example shape:
+
+```text
+subject: Claude Code
+action: deploy
+resource: production
+condition: required checks passed
+decision_requested: autonomous_authority
+response_type: single_select
+```
+
+Question-design rules:
+
+- ask one consequential decision at a time;
+- prefer `Yes / No / Conditional / Ask me` or similarly bounded choices;
+- make the consequence explicit, such as "production deployment" rather than "deploy";
+- separate read, write, delete, spend, publish, delegate, approve, and credential access where those distinctions matter;
+- never infer permission from tone, preference, past context, or prior approval of a different action;
+- unanswered authority defaults must not expand authority;
+- free text may collect labels, named resources, rationales, or custom thresholds, but should not be the primary mechanism for granting consequential authority;
+- before activation, show the resulting authority envelope back to the user in plain language for explicit confirmation.
+
+The output is **deterministic policy, not conversational inference**.
+
+This interview can be used during onboarding and later when the system detects an unresolved authority dimension, a newly connected integration, delegation capability, spending rail, drift condition, or repeated approval pattern. Repeated approvals may justify proposing a narrower standing rule, but the proposal must still require explicit confirmation before authority changes.
+
+A useful onboarding sequence is:
+
+**Connect → Interview → Review authority envelope → Confirm → Protect**
+
 ## Embedded experience
 
 khrystal should not become an extra mandatory destination in the user’s workflow.
