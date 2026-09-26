@@ -49,7 +49,7 @@ At completion of material work, report: product result, ecosystem implications, 
 
 For MCP, A2A, x402, AP2, UCP, Visa TAP, AP4M, or other agent-protocol integration work, read the protocol-integration section of `PRODUCT_DIRECTION.md` before planning or implementation.
 
-Treat MCP, A2A, and x402 as the first **directional adapter targets** and AP2, UCP, Visa TAP, and AP4M as future interoperability targets. None are implemented-support claims unless the repository's evidence table and runtime verification explicitly say otherwise.
+Treat MCP and A2A as the first **directional adapter targets**. Treat x402 as an **implemented but dormant adapter**: code/tests exist, but wallet activation, funding, and a live spending proof are deferred until the POC-first milestone in #63. AP2, UCP, Visa TAP, and AP4M remain future interoperability targets. Never infer activated support from design direction alone; use the repository evidence table and runtime verification state.
 
 Protocol adapters must:
 
@@ -58,6 +58,8 @@ Protocol adapters must:
 - never widen delegated authority, scope, budget, context, tools, or time;
 - keep reusable wallet/payment/provider credentials outside policy records;
 - preserve `ALLOW / DENY / APPROVE → enforce → verify → evidence` semantics at the protected boundary;
+- treat wallet funding, production network enablement, or production credential configuration as an **enforcement activation event** requiring explicit review rather than routine setup;
+- for x402, follow the deferred test-wallet/Base-Sepolia/single-resource/tiny-cap activation sequence in `PRODUCT_DIRECTION.md` after #63;
 - avoid displacing the current Agent Release Assurance / first-client enforcement proof without explicit reprioritization.
 
 ## Repository Safety
