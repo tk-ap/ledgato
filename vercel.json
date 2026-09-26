@@ -4,10 +4,25 @@
   "installCommand": "cd web && npm install",
   "buildCommand": "cd web && npm run test && npm run build",
   "outputDirectory": "web/dist",
+  "redirects": [
+    {
+      "source": "/signup",
+      "destination": "/login",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
+      "source": "/login",
+      "destination": "/api/owner-login"
+    },
+    {
+      "source": "/app",
+      "destination": "/api/app-gate?next=/app"
+    },
+    {
       "source": "/app/:path*",
-      "destination": "/index.html"
+      "destination": "/api/app-gate?next=/app/:path*"
     },
     {
       "source": "/agent-controls/:path*",
@@ -15,14 +30,6 @@
     },
     {
       "source": "/how-it-works/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/login",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/signup",
       "destination": "/index.html"
     }
   ]
