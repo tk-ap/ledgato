@@ -201,6 +201,39 @@ class EnforcementGateway:
             "jit_grant": jit.to_dict() if jit else None,
         }
 
+    def approve_and_resume(
+        self,
+        approval_id: str,
+        *,
+        decided_by: str,
+        reason: str | None = None,
+        jit_ttl_seconds: int | None = 60,
+    ) -> dict[str, Any]:
+        """Approve one pending action and resume it exactly once.
+
+        The resume token never leaves the gateway boundary. This is the
+        preferred control-plane operation for an owner selecting "Allow once".
+        A retry after consumption fails closed instead of executing twice.
+        """
+        approved = self.approve(
+            approval_id,
+            decided_by=decided_by,
+            reason=reason,
+            jit_ttl_seconds=jit_ttl_seconds,
+        )
+        internal_approval = approved["approval"]
+        resume_token = internal_approval.get("resume_token")
+        if not resume_token:
+            raise ValueError("approved action did not produce a resume token")
+        execution = self.resume(approval_id, resume_token=resume_token)
+        public_approval = dict(internal_approval)
+        public_approval.pop("resume_token", None)
+        return {
+            "approval": public_approval,
+            "jit_grant": approved.get("jit_grant"),
+            "execution": execution,
+        }
+
     def deny_approval(self, approval_id: str, *, decided_by: str, reason: str | None = None) -> dict[str, Any]:
         item = self.approvals.decide(
             approval_id, approved=False, decided_by=decided_by, reason=reason
