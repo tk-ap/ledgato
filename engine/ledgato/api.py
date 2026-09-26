@@ -20,6 +20,7 @@ from .adapters.base import EnforcementAdapter
 from .adapters.github import GitHubAdapter
 from .adapters.x402 import X402Adapter
 from .approvals import ApprovalStore
+from .decision_prompt import from_approval as decision_prompt_from_approval
 from .principals import (
     IdentityClaimError,
     Principal,
@@ -665,6 +666,30 @@ def create_app(
     @app.get("/v1/approvals", dependencies=[Depends(_auth)])
     def list_approvals(status: str | None = None):
         return {"approvals": [a.to_dict() for a in approvals.list(status=status)]}
+
+    @app.get("/v1/decision-prompts")
+    def list_decision_prompts(
+        status: str | None = "PENDING",
+        principal: Principal = Depends(_principal),
+    ):
+        _require_role(principal, allowed={"approver", "admin"}, action="read decision prompts")
+        return {
+            "prompts": [
+                decision_prompt_from_approval(item).to_dict()
+                for item in approvals.list(status=status)
+            ]
+        }
+
+    @app.get("/v1/decision-prompts/{approval_id}")
+    def get_decision_prompt(
+        approval_id: str,
+        principal: Principal = Depends(_principal),
+    ):
+        _require_role(principal, allowed={"approver", "admin"}, action="read decision prompts")
+        item = approvals.get(approval_id)
+        if not item:
+            raise HTTPException(404, f"unknown approval '{approval_id}'")
+        return decision_prompt_from_approval(item).to_dict()
 
     @app.post("/v1/approvals/{approval_id}/approve")
     def approve(

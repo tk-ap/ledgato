@@ -17,6 +17,24 @@ function requestOrigin(req) {
 
 function publicApproval(item) {
   if (!item || typeof item !== 'object') return null
+  if (item.version === 'ledgato.decision-prompt/v1') {
+    return {
+      id: item.decision_id,
+      agent: item.agent,
+      task_id: item.task_id || null,
+      adapter: item.boundary?.adapter || null,
+      action: {
+        tool: item.requested_action?.tool,
+        domain: item.requested_action?.resource,
+        impact: item.requested_action?.impact,
+        intent: item.requested_action?.intent || null,
+      },
+      requested_at: item.requested_at,
+      requested_by: null,
+      status: item.state,
+      prompt: item,
+    }
+  }
   return {
     id: item.id,
     agent: item.agent,
@@ -26,6 +44,7 @@ function publicApproval(item) {
     requested_at: item.requested_at,
     requested_by: item.requested_by || null,
     status: item.status,
+    prompt: item.decision_prompt || null,
   }
 }
 
@@ -117,13 +136,13 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     let response
     try {
-      response = await engineRequest(config, '/v1/approvals?status=PENDING')
+      response = await engineRequest(config, '/v1/decision-prompts?status=PENDING')
     } catch {
       return res.status(503).json({ ok: false, error: 'engine_unreachable' })
     }
     if (!response.ok) return res.status(502).json({ ok: false, error: 'engine_approval_read_failed' })
     const body = await response.json().catch(() => ({}))
-    const approvals = Array.isArray(body.approvals) ? body.approvals.map(publicApproval).filter(Boolean) : []
+    const approvals = Array.isArray(body.prompts) ? body.prompts.map(publicApproval).filter(Boolean) : []
     return res.status(200).json({
       ok: true,
       owner: { id: owner.owner.id, email: owner.owner.email },

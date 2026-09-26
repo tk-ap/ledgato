@@ -53,6 +53,22 @@ Before material authenticated-frontend work, read `FRONTEND_ARCHITECTURE.md` and
 
 > **Closing the Ledgato tab must not weaken, disable, or pause an already configured enforcement boundary.**
 
+### Inline Decision Prompt invariant
+
+When a governed action pauses for human approval, the authority question should
+appear in the surface the owner is already using (web control room, agent chat,
+TUI, Telegram, or another approved client) rather than requiring a visit to the
+Ledgato site.
+
+All channels must render the same server-derived `DecisionPrompt` contract.
+A channel may change layout, button style, or verbosity; it may not invent a
+different scope, approval object, or decision semantics.
+
+The default consequential choices are `Allow once`, `Deny`, and
+`Why was this held?`. `Allow once` must resume the exact stored action
+server-side and must not create standing authority. Informational inspection
+must never grant authority.
+
 A skill/prompt may help an agent understand Ledgato responses, but it is not an enforcement boundary. Prefer adapters, SDK/gateway hooks, or other execution-path controls that the agent cannot simply reason around.
 
 ## Progressive Authority Calibration Guardrail

@@ -38,6 +38,11 @@ outbound:
     contract: contracts/authority-decision.schema.json
     trigger: an authority request is evaluated
     evidence_state: implemented, tested
+  - to: agent-os-workforce
+    repository: tk-ap/ledgato
+    contract: contracts/decision-prompt.schema.json
+    trigger: a protected action is paused pending an owner/approver decision
+    evidence_state: implemented contract + API projection; transport rendering is adapter-owned
   - to: ailhat
     repository: tk-ap/ledgato
     contract: contracts/authority-status.schema.json
