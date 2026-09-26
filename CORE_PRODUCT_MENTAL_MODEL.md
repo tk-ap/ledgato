@@ -53,6 +53,16 @@ A useful product split is:
 
 A valid autonomous integration should continue to enforce the same policy after the user closes the browser.
 
+## Authority calibration
+
+Ledgato should establish only the minimum useful standing authority up front, then resolve new consequential boundaries in context.
+
+A healthy operating loop is:
+
+`minimal baseline → autonomous work → contextual approval when needed → scoped authority record → automatic resume → verification → explicit policy refinement`
+
+The system may learn what rule to **propose** from repeated decisions, but it may not infer or silently expand authority. Unknown consequential authority remains denied or approval-required according to policy until explicitly resolved.
+
 ## Product test
 
 When evaluating a proposed feature, integration, claim, or design, ask:
