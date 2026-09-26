@@ -459,6 +459,67 @@ A useful first-run sequence is therefore:
 
 **Connect → Minimal calibration → Protect → Calibrate in context**
 
+## Jev pre-decision intelligence
+
+Jev is a candidate **pre-decision intelligence layer** for Progressive Authority Calibration. It may help Ledgato determine what kind of boundary is being encountered and what information is missing, but it must not become the source of authorization.
+
+The intended placement is:
+
+```text
+agent action request
+        ↓
+Jev advisory analysis
+(classify / match / novelty / missing decision / minimal question)
+        ↓
+Ledgato deterministic policy + authority records
+        ↓
+ALLOW / DENY / APPROVE
+        ↓
+enforcement
+        ↓
+independent downstream verification
+```
+
+Jev may:
+
+- classify the requested action/boundary;
+- identify candidate applicable policy or authority records;
+- detect materially novel requests or scope differences;
+- identify the minimum unresolved authority dimension;
+- generate/select a concise contextual question for the user;
+- detect repeated decision patterns;
+- propose a narrowly scoped standing rule for explicit confirmation;
+- abstain when confidence or evidence is insufficient.
+
+Jev must not:
+
+- return or activate an authoritative `ALLOW`, `DENY`, or `APPROVE` decision;
+- issue permits, credentials, grants, or execution authority;
+- silently expand scope from prior decisions;
+- transform ALVIRA context into authority;
+- modify standing policy without explicit confirmation;
+- substitute model confidence for deterministic policy evaluation or downstream verification.
+
+Jev output is therefore **advisory evidence** consumed by Ledgato. The authorization engine remains deterministic over explicit policy / authority records.
+
+### Promotion gate
+
+Do not place Jev into the live decision path merely because the integration interface exists.
+
+First benchmark it against labeled historical/synthetic authority-boundary cases covering:
+
+- boundary/action classification;
+- policy-match retrieval;
+- novelty / material-difference detection;
+- unresolved-authority identification;
+- minimal-question selection;
+- repeated-pattern detection and narrow rule proposals;
+- correct abstention under ambiguity or insufficient evidence.
+
+The benchmark must preserve a structural safety invariant: **Jev cannot directly produce executable authority.** Any runtime promotion must keep a deterministic Ledgato decision layer between Jev output and enforcement.
+
+The initial bootstrap/benchmark contract is documented in `JEV_PREDECISION_BOOTSTRAP.md`.
+
 ## Embedded experience
 
 khrystal should not become an extra mandatory destination in the user’s workflow.
