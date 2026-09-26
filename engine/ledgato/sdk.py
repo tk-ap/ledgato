@@ -78,6 +78,18 @@ class LedgatoClient:
             {"resume_token": resume_token},
         )
 
+    def decide(self, contract: dict[str, Any]) -> dict[str, Any]:
+        return self._call("POST", "/v1/enforcement/decide", {"contract": contract})
+
+    def record_outcome(self, decision_id: str, report: dict[str, Any]) -> dict[str, Any]:
+        return self._call("POST", f"/v1/enforcement/decisions/{decision_id}/outcome", report)
+
+    def evidence(self, decision_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/v1/enforcement/decisions/{decision_id}/evidence")
+
+    def public_key(self) -> str:
+        return self._call("GET", "/v1/enforcement/public-key")["public_key"]
+
     def _call(self, method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         data = json.dumps(body).encode() if body is not None else None
         headers = {"Content-Type": "application/json", "Accept": "application/json"}

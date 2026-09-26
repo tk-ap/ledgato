@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-os.local/contracts/action-contract.schema.json",
+  "title": "Ledgato Action Contract",
+  "description": "One consequential action AgentOS asks to perform. Submitted to POST /v1/enforcement/decide. A permit issued on ALLOW is bound to the SHA-256 of the canonical JSON of this object (sorted keys, no whitespace); changing any field after the decision invalidates the permit. Enforced by engine/ledgato/enforcement.py::ActionContract.from_dict.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "work_id", "agent", "requested_action", "resource", "policy"],
+  "properties": {
+    "version": {"const": "ledgato.action-contract/v1"},
+    "work_id": {"type": "string", "minLength": 1, "description": "AgentOS work item this action belongs to."},
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "identity"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "description": "Governed agent. Must equal the authenticated Ledgato principal."},
+        "identity": {"type": "string", "minLength": 1, "description": "IAM subject that identifies the agent. Recorded; grants nothing."}
+      }
+    },
+    "requested_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "impact"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "impact": {"enum": ["readonly", "write", "exec", "destructive"]},
+        "params": {"type": "object"}
+      }
+    },
+    "resource": {"type": "string", "minLength": 1, "description": "The protected resource. A permit is only accepted by the resource with this id."},
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "description": "Must name the policy Ledgato applies to this agent, or the decision is DENY."},
+        "digest": {"type": "string", "description": "Optional. If present and not equal to the applied policy's digest, the decision is DENY (stale policy)."}
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Requester-supplied references recorded verbatim in the ledger. Evidence informs review; it never grants authority.",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "properties": {"kind": {"type": "string", "minLength": 1}, "ref": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

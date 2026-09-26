@@ -35,6 +35,7 @@ from .campaign import (
 from .crypto import Signer
 from .distributed import Node
 from .engine import DENY, Decision, evaluate_action
+from .enforcement import ActionContract, ContractError, DecisionStore, EnforcementPoint
 from .gate import attest_release
 from .gateway import EnforcementGateway
 from .idempotency import IdempotencyStore
@@ -135,6 +136,16 @@ class AuthorityStatus(BaseModel):
     evidence_hash: str
 
 
+class EnforcementDecideRequest(BaseModel):
+    contract: dict[str, Any]
+
+
+class EnforcementOutcomeRequest(BaseModel):
+    status: Optional[str] = None
+    executed: bool
+    receipt: Optional[dict[str, Any]] = None
+
+
 class AttestVerifyIn(BaseModel):
     agent: str
     release: str
@@ -229,6 +240,7 @@ def create_app(
     approvals_path: str | Path | None = "approvals.json",
     idempotency_path: str | Path | None = "idempotency.json",
     campaigns_path: str | Path | None = "campaigns.json",
+    decisions_path: str | Path | None = "decisions.json",
     api_key: str | None = None,
     principals: PrincipalRegistry | None = None,
     require_auth: bool = True,
@@ -274,6 +286,13 @@ def create_app(
     app.state.idempotency = idempotency
     app.state.campaigns = campaigns
     app.state.adapters = registered_adapters
+    enforcement = EnforcementPoint(
+        policies=policies,
+        ledger=ledger,
+        signer=signer,
+        store=DecisionStore(decisions_path),
+    )
+    app.state.enforcement = enforcement
 
     configured_key = api_key or os.getenv("LEDGATO_API_KEY")
     registry = principals if principals is not None else PrincipalRegistry.from_env()
@@ -464,6 +483,48 @@ def create_app(
             raise HTTPException(404, str(exc)) from exc
         except Exception as exc:
             raise HTTPException(502, f"live discovery failed: {exc}") from exc
+
+    # ---- mandatory checkpoint: contract → decision → permit --------------
+    @app.get("/v1/enforcement/public-key", dependencies=[Depends(_auth)])
+    def enforcement_public_key():
+        return {"public_key": enforcement.public_key()}
+
+    @app.post("/v1/enforcement/decide")
+    def enforcement_decide(req: EnforcementDecideRequest, principal: Principal = Depends(_principal)):
+        # IAM identifies: the contract's agent must be the authenticated agent.
+        # A human, admin, or verifier credential cannot obtain a permit.
+        if principal.is_verifier():
+            raise HTTPException(403, f"verifier principal '{principal.id}' may not request permits")
+        _require_role(principal, allowed={"agent"}, action="request enforcement decisions")
+        try:
+            contract = ActionContract.from_dict(req.contract)
+        except ContractError as exc:
+            raise HTTPException(422, f"invalid action contract: {exc}") from exc
+        _claim(principal, contract.agent_id, field="contract.agent.id")
+        return enforcement.decide(contract, principal_id=principal.id)
+
+    @app.post("/v1/enforcement/decisions/{decision_id}/outcome")
+    def enforcement_outcome(
+        decision_id: str, req: EnforcementOutcomeRequest, principal: Principal = Depends(_principal)
+    ):
+        _require_role(principal, allowed={"agent"}, action="report enforcement outcomes")
+        try:
+            return enforcement.record_outcome(
+                decision_id, req.model_dump(), principal_id=principal.id
+            )
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.get("/v1/enforcement/decisions/{decision_id}/evidence", dependencies=[Depends(_auth)])
+    def enforcement_evidence(decision_id: str):
+        try:
+            return enforcement.evidence(decision_id)
+        except KeyError as exc:
+            raise HTTPException(404, str(exc)) from exc
 
     @app.post("/v1/gateway/execute")
     def gateway_execute(req: GatewayRequest, principal: Principal = Depends(_principal)):
