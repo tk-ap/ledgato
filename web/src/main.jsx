@@ -109,8 +109,50 @@ function HowItWorksPage(){return <div className="hiw"><HowItWorksHeader/><main>
   <footer className="footer"><div className="wrap"><div className="brand">LEDGAT<b>o</b></div><p className="mono" style={{color:'rgba(255,255,255,.45)',fontSize:13}}>Intelligence is not authority.</p></div></footer>
 </main></div>}
 
-function AppShell({path}){const title=useMemo(()=>appRoutes.find(([p])=>p===path)?.[1]||(path.startsWith('/app/agents/')?'Agent':'Overview'),[path]);return <div className="appShell"><aside className="side"><div className="brand">LEDGAT<b>o</b></div>{appRoutes.map(([p,l])=><Link key={p} to={p} className={path===p?'active':''}>{l}</Link>)}</aside><main className="appMain"><div className="eyebrow">{title==='Overview'?'Good morning':'LEDGATO WORKSPACE'}</div><h1>{title==='Overview'?'Your agent environment':title}</h1>{title==='Overview'?<Overview/>:<RouteView path={path} title={title}/>}</main></div>}
-function Overview(){return <><p className="copy" style={{maxWidth:720}}>{claims.appStatus}</p><div className="statusPill"><span className="dot"/>{statusLabels.unavailable}</div><div className="appGrid">{[['—','AGENTS'],['—','PROTECTED ACTIONS'],['—','DECISIONS'],['—','EVIDENCE']].map(x=><div className="stat" key={x[1]}><strong>{x[0]}</strong><small>{x[1]}</small></div>)}</div><div className="routeCard"><h2>Waiting for the engine…</h2><p>Engine-derived data appears only when a connected enforcement runtime reports current state. Nothing in this unavailable state is presented as live enforcement.</p></div></>}
+function AppShell({path}){const title=useMemo(()=>appRoutes.find(([p])=>p===path)?.[1]||(path.startsWith('/app/agents/')?'Agent':'Overview'),[path]);return <div className="appShell"><aside className="side"><div className="brand">LEDGAT<b>o</b></div>{appRoutes.map(([p,l])=><Link key={p} to={p} className={path===p?'active':''}>{l}</Link>)}</aside><main className="appMain"><div className="eyebrow">{title==='Overview'?'OWNER CONTROL CENTER':'LEDGATO WORKSPACE'}</div><h1>{title==='Overview'?'What Ledgato knows right now':title}</h1>{title==='Overview'?<Overview/>:<RouteView path={path} title={title}/>}</main></div>}
+function Overview(){return <div className="ownerHome">
+  <section className="ownerStatus">
+    <div>
+      <span className="ownerKicker">CURRENT STATE</span>
+      <h2>Ledgato is waiting for a connected enforcement runtime.</h2>
+      <p>That means Ledgato can show you the control model, but it cannot truthfully tell you what your agents are doing right now. Live counts and decisions stay blank until the engine reports them.</p>
+    </div>
+    <div className="ownerStateBadge"><span className="dot"/>{statusLabels.unavailable}</div>
+  </section>
+
+  <section className="ownerQuestion">
+    <div className="ownerQuestionHead"><span>THE THREE WORDS THAT MATTER</span><p>Use these to tell what is merely configured from what Ledgato has actually proved or can stop.</p></div>
+    <div className="ownerMeaningGrid">
+      <article><span className="meaningTag declared">DECLARED</span><h3>What should be allowed?</h3><p>A policy says an agent may, may not, or needs approval to perform an action. This is intent — not proof.</p></article>
+      <article><span className="meaningTag verified">VERIFIED</span><h3>Did the boundary hold?</h3><p>Ledgato tested the declared boundary and preserved evidence of what happened.</p></article>
+      <article><span className="meaningTag enforced">ENFORCED</span><h3>Can Ledgato stop it?</h3><p>The action is routed through Ledgato, so ALLOW / DENY / APPROVE happens before the downstream tool is invoked.</p></article>
+    </div>
+  </section>
+
+  <section className="ownerAttention">
+    <div>
+      <span className="ownerKicker">WHAT NEEDS YOU</span>
+      <h2>No live decision feed is available yet.</h2>
+      <p>There is nothing for you to approve or resolve from this screen until the runtime connects. If you expected a live environment, check Runtime first.</p>
+    </div>
+    <Link to="/app/runtime" className="ownerAction">Check runtime →</Link>
+  </section>
+
+  <section className="ownerQuestion">
+    <div className="ownerQuestionHead"><span>START HERE</span><p>Four owner questions map directly to the technical views underneath.</p></div>
+    <div className="ownerNavGrid">
+      <Link to="/app/agents" className="ownerNavCard"><small>01</small><h3>What am I protecting?</h3><p>See the agents Ledgato knows about and the identities they use.</p><b>Agents →</b></Link>
+      <Link to="/app/authority" className="ownerNavCard"><small>02</small><h3>What can they actually reach?</h3><p>Inspect the path from agent to tool, resource, action, data and destination.</p><b>Authority →</b></Link>
+      <Link to="/app/verification" className="ownerNavCard"><small>03</small><h3>Have the boundaries been tested?</h3><p>Separate declared policy from boundaries that have been exercised and evidenced.</p><b>Verification →</b></Link>
+      <Link to="/app/runtime" className="ownerNavCard"><small>04</small><h3>What is Ledgato stopping now?</h3><p>See live ALLOW / DENY / APPROVE decisions when the enforcement runtime is connected.</p><b>Runtime →</b></Link>
+    </div>
+  </section>
+
+  <section className="ownerFooterNote">
+    <strong>Technical detail is still available.</strong>
+    <p>Policies, releases, ALVIRA state and signed evidence remain in the left navigation. The overview now exists to answer the owner-level questions first.</p>
+  </section>
+</div>}
 function RouteView({path,title}){if(path==='/app/agents')return <div className="routeCard"><h2>Your agents</h2><p>Demo records are explicitly sample data. Connected environments should replace these with engine-derived records.</p><ul className="agentList">{sampleAgents.map(a=><li key={a.id}><Link to={`/app/agents/${a.id}`}><strong>{a.name}</strong><div className="mono" style={{fontSize:11,color:'rgba(255,255,255,.45)',marginTop:6}}>{a.identity} · {a.status.toUpperCase()} · risk {a.risk}</div></Link></li>)}</ul></div>;if(path.startsWith('/app/agents/')){const id=path.split('/').pop();const a=sampleAgents.find(x=>x.id===id)||sampleAgents[0];return <div className="routeCard"><h2>{a.name}</h2><p>Identity: {a.identity}</p><p>Tools: {a.tools.join(', ')}</p><p>Data: {a.dataSources.join(', ')}</p><p>Destinations: {a.destinations.join(', ')}</p></div>}const copy={Authority:'Inspect connected agent → identity → tool → resource → action → data → destination paths. Sample paths are labeled as demo data.',Policies:'Declare what protected actions are allowed, denied, or require approval. Policy does not become enforcement until the action is routed through the gateway.',Verification:'Run boundary and regression checks against connected protected actions, then preserve verifiable evidence of the result.',Runtime:'Inspect ALLOW / DENY / APPROVE decisions produced by a connected enforcement runtime. Unavailable runtime state is shown as unavailable.',Releases:'Gate protected release workflows on policy and verification results without implying unrelated actions are controlled.', 'Live Alvira':'ALVIRA-connected engine state appears here only when the integration is reachable and explicitly reports engine-derived data.',Evidence:'Review signed decisions, downstream verification and proof records. Sample evidence and real proof remain visually distinct.'};return <div className="routeCard"><h2>{title}</h2><p>{copy[title]||'Workspace route preserved from the current production information architecture.'}</p><div className="statusPill">{statusLabels.demo}</div></div>}
 
 function App(){const [path,setPath]=useState(location.pathname);React.useEffect(()=>{const h=()=>setPath(location.pathname);addEventListener('popstate',h);return()=>removeEventListener('popstate',h)},[]);if(path==='/login')return <Auth/>;if(path==='/signup')return <Auth signup/>;if(path==='/how-it-works'||path==='/how-it-works/')return <HowItWorksPage/>;if(path==='/agent-controls'||path==='/agent-controls/')return <AgentControlsPage/>;if(path.startsWith('/app'))return <AppShell path={path}/>;return <Homepage/>}

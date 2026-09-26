@@ -72,3 +72,35 @@
 .hiwOut h3{margin:8px 0 0;font-size:24px;letter-spacing:-.02em}
 .hiwOut p{margin:6px 0 0;color:rgba(255,255,255,.58)}
 @media(max-width:900px){.flow{grid-template-columns:1fr}.flow .fstep:not(:last-child)::after{right:auto;left:50%;top:auto;bottom:-9px;transform:translateX(-50%) rotate(90deg)}.layers3,.persp{grid-template-columns:1fr}.hiwHero{padding-top:56px}}
+
+
+/* --- owner-readable /app overview --- */
+.ownerHome{max-width:1120px;display:grid;gap:18px}
+.ownerStatus,.ownerAttention{border:1px solid var(--line);background:linear-gradient(135deg,rgba(46,123,255,.09),rgba(21,22,26,.42));padding:28px;display:flex;align-items:flex-start;justify-content:space-between;gap:28px}
+.ownerStatus h2,.ownerAttention h2{font-size:clamp(24px,3vw,36px);letter-spacing:-.03em;margin:10px 0 10px;max-width:720px}
+.ownerStatus p,.ownerAttention p,.ownerQuestionHead p,.ownerMeaningGrid p,.ownerNavCard p,.ownerFooterNote p{color:rgba(255,255,255,.6);line-height:1.6;margin:0}
+.ownerKicker,.ownerQuestionHead>span{font:10px 'JetBrains Mono';letter-spacing:.18em;color:var(--electricSoft)}
+.ownerStateBadge{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(240,184,76,.35);background:rgba(240,184,76,.07);color:var(--amber);padding:9px 12px;border-radius:999px;font:10px 'JetBrains Mono';letter-spacing:.12em;text-transform:uppercase}
+.ownerQuestion{border:1px solid var(--line);background:rgba(21,22,26,.28)}
+.ownerQuestionHead{display:flex;justify-content:space-between;gap:24px;align-items:baseline;padding:18px 20px;border-bottom:1px solid var(--line)}
+.ownerQuestionHead p{font-size:13px;max-width:620px}
+.ownerMeaningGrid{display:grid;grid-template-columns:repeat(3,1fr)}
+.ownerMeaningGrid article{padding:24px;border-right:1px solid var(--line)}
+.ownerMeaningGrid article:last-child{border-right:0}
+.ownerMeaningGrid h3{font-size:20px;margin:16px 0 8px}
+.meaningTag{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:6px 9px;font:10px 'JetBrains Mono';letter-spacing:.12em}
+.meaningTag.declared{color:var(--amber);border-color:rgba(240,184,76,.4);background:rgba(240,184,76,.06)}
+.meaningTag.verified{color:var(--mint);border-color:rgba(97,224,169,.4);background:rgba(97,224,169,.06)}
+.meaningTag.enforced{color:var(--electricSoft);border-color:rgba(46,123,255,.45);background:rgba(46,123,255,.08)}
+.ownerAttention{background:rgba(255,255,255,.018)}
+.ownerAction{flex:0 0 auto;border:1px solid rgba(46,123,255,.45);background:rgba(46,123,255,.1);color:var(--electricSoft);border-radius:999px;padding:11px 16px;font:11px 'JetBrains Mono';letter-spacing:.08em}
+.ownerNavGrid{display:grid;grid-template-columns:repeat(2,1fr)}
+.ownerNavCard{padding:24px;min-height:190px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);transition:background .15s ease,border-color .15s ease}
+.ownerNavCard:nth-child(2n){border-right:0}.ownerNavCard:nth-last-child(-n+2){border-bottom:0}
+.ownerNavCard:hover{background:rgba(46,123,255,.06)}
+.ownerNavCard small{font:10px 'JetBrains Mono';color:var(--electric);letter-spacing:.14em}
+.ownerNavCard h3{font-size:22px;margin:14px 0 8px}
+.ownerNavCard b{display:block;margin-top:20px;color:var(--electricSoft);font:11px 'JetBrains Mono';letter-spacing:.08em}
+.ownerFooterNote{border-left:2px solid var(--electric);padding:12px 0 12px 18px}
+.ownerFooterNote strong{display:block;margin-bottom:4px}
+@media(max-width:760px){.ownerStatus,.ownerAttention,.ownerQuestionHead{flex-direction:column}.ownerMeaningGrid,.ownerNavGrid{grid-template-columns:1fr}.ownerMeaningGrid article,.ownerNavCard{border-right:0;border-bottom:1px solid var(--line)}.ownerMeaningGrid article:last-child,.ownerNavCard:last-child{border-bottom:0}.ownerStateBadge,.ownerAction{align-self:flex-start}.appMain h1{font-size:38px}}
