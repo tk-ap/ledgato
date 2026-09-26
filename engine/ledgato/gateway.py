@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from .adapters.base import EnforcementAdapter, ExecutionReceipt
-from .approvals import APPROVED, ApprovalStore
+from .approvals import APPROVED, PENDING, ApprovalStore
 from .boundary import BoundaryStore
 from .campaign import CampaignAuthorityStore, authorize_campaign_action
 from .authority import AuthorityStore
@@ -199,6 +199,64 @@ class EnforcementGateway:
         return {
             "approval": item.to_dict(include_resume_token=True),
             "jit_grant": jit.to_dict() if jit else None,
+        }
+
+    def approve_and_resume(
+        self,
+        approval_id: str,
+        *,
+        decided_by: str,
+        reason: str | None = None,
+        jit_ttl_seconds: int | None = 60,
+    ) -> dict[str, Any]:
+        """Approve one pending action and resume it exactly once.
+
+        The resume token never leaves the gateway boundary. This is the
+        preferred control-plane operation for an owner selecting "Allow once".
+        A retry after approval-but-before-resume recovers the pending resume.
+        A retry after consumption fails closed instead of executing twice.
+        """
+        existing = self.approvals.get(approval_id)
+        if existing is None:
+            raise KeyError(approval_id)
+
+        if existing.status == PENDING:
+            approved = self.approve(
+                approval_id,
+                decided_by=decided_by,
+                reason=reason,
+                jit_ttl_seconds=jit_ttl_seconds,
+            )
+            internal_approval = approved["approval"]
+            jit_grant = approved.get("jit_grant")
+        elif existing.status == APPROVED:
+            # Recover a prior approve-and-resume call that stopped after the
+            # approval commit but before consuming the resume token.
+            if existing.decided_by != decided_by:
+                raise ValueError(
+                    "approval was already approved by a different principal"
+                )
+            internal_approval = existing.to_dict(include_resume_token=True)
+            grant = (
+                self.authority.get(existing.jit_grant_id)
+                if existing.jit_grant_id else None
+            )
+            jit_grant = grant.to_dict() if grant else None
+        else:
+            raise ValueError(
+                f"approval is already {existing.status}; it cannot be approved again"
+            )
+
+        resume_token = internal_approval.get("resume_token")
+        if not resume_token:
+            raise ValueError("approved action did not produce a resume token")
+        execution = self.resume(approval_id, resume_token=resume_token)
+        public_approval = dict(internal_approval)
+        public_approval.pop("resume_token", None)
+        return {
+            "approval": public_approval,
+            "jit_grant": jit_grant,
+            "execution": execution,
         }
 
     def deny_approval(self, approval_id: str, *, decided_by: str, reason: str | None = None) -> dict[str, Any]:

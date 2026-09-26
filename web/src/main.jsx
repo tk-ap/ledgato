@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react'
+import React, {useEffect, useMemo, useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {claims,statusLabels} from './content/claims.js'
 import './styles.css'
@@ -109,8 +109,255 @@ function HowItWorksPage(){return <div className="hiw"><HowItWorksHeader/><main>
   <footer className="footer"><div className="wrap"><div className="brand">LEDGAT<b>o</b></div><p className="mono" style={{color:'rgba(255,255,255,.45)',fontSize:13}}>Intelligence is not authority.</p></div></footer>
 </main></div>}
 
-function AppShell({path}){const title=useMemo(()=>appRoutes.find(([p])=>p===path)?.[1]||(path.startsWith('/app/agents/')?'Agent':'Overview'),[path]);return <div className="appShell"><aside className="side"><div className="brand">LEDGAT<b>o</b></div>{appRoutes.map(([p,l])=><Link key={p} to={p} className={path===p?'active':''}>{l}</Link>)}</aside><main className="appMain"><div className="eyebrow">{title==='Overview'?'Good morning':'LEDGATO WORKSPACE'}</div><h1>{title==='Overview'?'Your agent environment':title}</h1>{title==='Overview'?<Overview/>:<RouteView path={path} title={title}/>}</main></div>}
-function Overview(){return <><p className="copy" style={{maxWidth:720}}>{claims.appStatus}</p><div className="statusPill"><span className="dot"/>{statusLabels.unavailable}</div><div className="appGrid">{[['—','AGENTS'],['—','PROTECTED ACTIONS'],['—','DECISIONS'],['—','EVIDENCE']].map(x=><div className="stat" key={x[1]}><strong>{x[0]}</strong><small>{x[1]}</small></div>)}</div><div className="routeCard"><h2>Waiting for the engine…</h2><p>Engine-derived data appears only when a connected enforcement runtime reports current state. Nothing in this unavailable state is presented as live enforcement.</p></div></>}
+const verifiedBoundaryScenarios=[
+  {
+    id:'blocked',
+    tab:'Blocked',
+    title:'Agent tried a destructive action it was not allowed to perform.',
+    action:'release.delete → service::billing-api',
+    decision:'Blocked',
+    decisionClass:'blocked',
+    execution:'Protected resource was never called.',
+    result:'No side effect occurred.',
+    proof:'LEDGATo returned DENY and the protected resource effect log remained unchanged.',
+    bypass:'Direct calls without a valid one-use LEDGATo permit were rejected.',
+    drift:'Historical lab proof. Not a live deployment check.'
+  },
+  {
+    id:'allowed',
+    tab:'Allowed',
+    title:'Agent performed the exact action it was authorized to perform.',
+    action:'release.deploy → service::billing-api',
+    decision:'Allowed',
+    decisionClass:'allowed',
+    execution:'Protected resource accepted one matching permit.',
+    result:'Exactly one side effect occurred.',
+    proof:'The resource persisted the effect and LEDGATo evidence survived process restart.',
+    bypass:'Replaying the same permit was rejected; side effects stayed at one.',
+    drift:'Historical lab proof. Not a live deployment check.'
+  },
+  {
+    id:'approval',
+    tab:'Needs you',
+    title:'Agent reached an action that required a person before anything could happen.',
+    action:'release.rollback → service::billing-api',
+    decision:'Waiting for you',
+    decisionClass:'approval',
+    execution:'Protected resource was not called.',
+    result:'Action stayed paused.',
+    proof:'APPROVAL_REQUIRED carried no permit the resource could accept.',
+    bypass:'A human approval path is implemented elsewhere in the gateway, but this protected-resource proof does not yet issue a permit after approval.',
+    drift:'Known limitation — approval-to-permit is still unproven for this boundary.'
+  },
+  {
+    id:'escape',
+    tab:'Escape attempt',
+    title:'Caller tried to go around LEDGATo and hit the protected resource directly.',
+    action:'direct /perform call → protected resource',
+    decision:'Rejected',
+    decisionClass:'blocked',
+    execution:'Resource refused the request before performing the effect.',
+    result:'Side effects stayed unchanged.',
+    proof:'No permit, replayed permit, retargeted permit, forged permit, wrong identity and stale/reused permits were rejected in the bounded lab.',
+    bypass:'No tested bypass vector crossed this protected-resource boundary.',
+    drift:'This does not prove every future deployment is non-bypassable; deployment isolation must be re-checked.'
+  }
+]
+
+function AppShell({path}){const title=useMemo(()=>appRoutes.find(([p])=>p===path)?.[1]||(path.startsWith('/app/agents/')?'Agent':'Overview'),[path]);return <div className="appShell"><aside className="side"><div className="brand">LEDGAT<b>o</b></div>{appRoutes.map(([p,l])=><Link key={p} to={p} className={path===p?'active':''}>{l}</Link>)}</aside><main className="appMain"><div className="eyebrow">{title==='Overview'?'CONTROL CENTER':'LEDGATO WORKSPACE'}</div><h1>{title==='Overview'?'What happened. What can happen next.':title}</h1>{title==='Overview'?<Overview/>:<RouteView path={path} title={title}/>}</main></div>}
+
+
+function actionLabel(approval){
+  const action=approval?.action||{}
+  return {
+    tool:action.tool||'Unknown consequential action',
+    resource:action.domain||'Unspecified resource',
+    impact:action.impact||'unknown',
+    task:approval?.task_id||'No task id',
+    agent:approval?.agent||'Unknown agent'
+  }
+}
+
+function ProgressiveAuthorityPanel(){
+  const [state,setState]=useState({kind:'loading',approvals:[],message:''})
+  const [busy,setBusy]=useState(null)
+  const [lastResult,setLastResult]=useState(null)
+
+  const load=async()=>{
+    setState(s=>({...s,kind:'loading',message:''}))
+    try{
+      const response=await fetch('/api/control/approvals',{credentials:'same-origin',cache:'no-store'})
+      const body=await response.json().catch(()=>({}))
+      if(response.status===401){setState({kind:'auth',approvals:[],message:'Owner session required.'});return}
+      if(!response.ok){setState({kind:'unavailable',approvals:[],message:body.error||'Control API unavailable.'});return}
+      setState({kind:'connected',approvals:Array.isArray(body.approvals)?body.approvals:[],message:''})
+    }catch{
+      setState({kind:'unavailable',approvals:[],message:'Control API unavailable.'})
+    }
+  }
+
+  useEffect(()=>{load()},[])
+
+  const decide=async(approvalId,decision)=>{
+    setBusy(approvalId)
+    setLastResult(null)
+    try{
+      const response=await fetch('/api/control/approvals',{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({approval_id:approvalId,decision})
+      })
+      const body=await response.json().catch(()=>({}))
+      if(!response.ok){
+        setLastResult({ok:false,message:body.error||'Decision failed.'})
+      }else{
+        setLastResult({ok:true,decision,execution:body.execution||null})
+        await load()
+      }
+    }catch{
+      setLastResult({ok:false,message:'Decision failed before the control API could confirm the result.'})
+    }finally{
+      setBusy(null)
+    }
+  }
+
+  const approval=state.approvals[0]
+  const info=actionLabel(approval)
+
+  return <section className="pocAttention liveAuthority">
+    <div className="pocSectionHead">
+      <div>
+        <span className="pocKicker">WHAT NEEDS YOU</span>
+        <h2>{approval?'One consequential action is waiting for a decision.':'Nothing needs you right now.'}</h2>
+      </div>
+      <span className={'pocBadge '+(state.kind==='connected'?'verified':'pending')}>
+        {state.kind==='connected'?'OWNER + ENGINE':'CONTROL STATUS'}
+      </span>
+    </div>
+
+    {state.kind==='loading'&&<div className="pocEmptyAction"><strong>Checking pending authority…</strong><span>Routine agent work does not require this tab to stay open.</span></div>}
+
+    {state.kind==='auth'&&<div className="pocEmptyAction"><strong>Owner session required</strong><span>The approval surface stays unavailable until the persisted ALVIRA-backed owner session is valid.</span><Link to="/login">Sign in →</Link></div>}
+
+    {state.kind==='unavailable'&&<div className="pocEmptyAction"><strong>Control API not connected</strong><span>{state.message} Historical proof remains below; this state is not presented as live enforcement.</span><button className="quietButton" onClick={load}>Retry</button></div>}
+
+    {state.kind==='connected'&&!approval&&<div className="pocEmptyAction"><strong>No pending approvals</strong><span>Configured boundaries continue running without this page open. You appear only when policy returns “needs approval.”</span><button className="quietButton" onClick={load}>Refresh</button></div>}
+
+    {state.kind==='connected'&&approval&&<article className="authorityPrompt">
+      <div className="authorityPromptMain">
+        <span className="plainDecision approval">Waiting for you</span>
+        <h3>{info.agent} wants to perform <code>{info.tool}</code>.</h3>
+        <p>This request is paused. Nothing downstream should happen until you make an explicit scoped decision.</p>
+        <div className="authorityFacts">
+          <div><small>RESOURCE</small><strong>{info.resource}</strong></div>
+          <div><small>IMPACT</small><strong>{info.impact}</strong></div>
+          <div><small>TASK</small><strong>{info.task}</strong></div>
+          <div><small>SCOPE</small><strong>this exact pending action</strong></div>
+        </div>
+      </div>
+      <div className="authorityDecision">
+        <span className="pocKicker">CHOOSE THE AUTHORITY</span>
+        <button disabled={busy===approval.id} className="allowOnce" onClick={()=>decide(approval.id,'allow_once')}>Allow once</button>
+        <button disabled={busy===approval.id} className="denyAction" onClick={()=>decide(approval.id,'deny')}>Deny</button>
+        <small>“Allow once” approves this pending request, resumes it server-side exactly once, and returns the downstream verification result. It does not create a standing rule.</small>
+      </div>
+    </article>}
+
+    {lastResult&&<div className={'authorityResult '+(lastResult.ok?'okResult':'badResult')}>
+      {lastResult.ok
+        ? <><strong>{lastResult.decision==='allow_once'?'Decision recorded and workflow resumed.':'Decision recorded: denied.'}</strong>{lastResult.execution&&<span>{lastResult.execution.executed?'Action happened.':'Action did not happen.'} {lastResult.execution.verification?.verified?'Downstream verification passed.':'See evidence for verification state.'}</span>}</>
+        : <><strong>Decision was not completed.</strong><span>{lastResult.message}</span></>}
+    </div>}
+  </section>
+}
+
+function Overview(){
+  const [scenarioId,setScenarioId]=useState('escape')
+  const scenario=verifiedBoundaryScenarios.find(x=>x.id===scenarioId)||verifiedBoundaryScenarios[0]
+  return <div className="pocHome">
+    <section className="pocTopline">
+      <div>
+        <span className="pocKicker">CURRENT PRODUCT STATE</span>
+        <h2>One bounded enforcement proof is verified. Live authority state appears only when the control path confirms it.</h2>
+        <p>This screen keeps <b>historical proof</b> separate from current owner + engine state. A connected approval below is live; the lab scenarios remain bounded historical evidence.</p>
+      </div>
+      <span className="pocBadge pending">{statusLabels.unavailable}</span>
+    </section>
+
+    <ProgressiveAuthorityPanel/>
+
+    <section className="pocProof">
+      <div className="pocSectionHead">
+        <div><span className="pocKicker">VERIFIED BOUNDARY PROOF</span><h2>Can an agent cross the line without permission?</h2></div>
+        <span className="pocBadge verified">VERIFIED · LAB</span>
+      </div>
+      <div className="proofTabs" role="tablist" aria-label="Verified boundary scenarios">
+        {verifiedBoundaryScenarios.map(item=><button key={item.id} className={scenarioId===item.id?'active':''} onClick={()=>setScenarioId(item.id)}>{item.tab}</button>)}
+      </div>
+      <article className="proofExplorer">
+        <div className="proofSummary">
+          <span className={'plainDecision '+scenario.decisionClass}>{scenario.decision}</span>
+          <h3>{scenario.title}</h3>
+          <p className="proofAction">{scenario.action}</p>
+        </div>
+        <div className="proofSteps">
+          <div><small>WHAT TRIED TO HAPPEN</small><strong>{scenario.action}</strong></div>
+          <div><small>WHAT LEDGATO DID</small><strong>{scenario.decision}</strong></div>
+          <div><small>DID THE ACTION HAPPEN?</small><strong>{scenario.execution}</strong></div>
+          <div><small>WHAT ACTUALLY HAPPENED</small><strong>{scenario.result}</strong></div>
+          <div><small>HOW WE KNOW</small><strong>{scenario.proof}</strong></div>
+        </div>
+      </article>
+    </section>
+
+    <section className="boundaryGrid">
+      <article className="boundaryCard strong">
+        <span className="pocKicker">CAN IT GO AROUND THE RULE?</span>
+        <h3>{scenario.bypass}</h3>
+        <p>The protected resource itself requires a valid LEDGATo-signed, one-use permit bound to the exact request. The agent cannot create that permit itself.</p>
+        <Link to="/app/verification">Inspect boundary proof →</Link>
+      </article>
+      <article className="boundaryCard">
+        <span className="pocKicker">HAS THE BOUNDARY DRIFTED?</span>
+        <h3>Live drift status is not available.</h3>
+        <p>{scenario.drift}</p>
+        <Link to="/app/runtime">Connect runtime to re-check →</Link>
+      </article>
+    </section>
+
+    <section className="pocProtected">
+      <div className="pocSectionHead">
+        <div><span className="pocKicker">PROTECTED BOUNDARY</span><h2>One mechanism is proven. Production escape checks remain deployment-specific.</h2></div>
+      </div>
+      <div className="protectedRow">
+        <div><small>BOUNDARY</small><strong>Agent → consequential action → protected resource</strong></div>
+        <div><small>PROOF</small><strong className="ok">23 cross-process checks passed</strong></div>
+        <div><small>BYPASS</small><strong className="ok">Tested vectors rejected</strong></div>
+        <div><small>LIVE DRIFT</small><strong className="warn">Not connected</strong></div>
+      </div>
+      <p className="protectedNote">GitHub denial/readback remains useful external-provider evidence, but the protected-resource proof is stronger: direct invocation, replay, retargeting, forged permits, wrong identities, restart and LEDGATo outage were exercised without creating extra side effects.</p>
+    </section>
+
+    <section className="pocNext">
+      <div className="pocSectionHead">
+        <div><span className="pocKicker">NEXT MARKET PROOFS</span><h2>Same control model. More relatable consequences.</h2></div>
+        <p>These are priorities, not live capabilities in this screen.</p>
+      </div>
+      <div className="nextProofGrid">
+        <article><span>01</span><h3>Send a message</h3><p>Draft freely. Sending to a real person is the boundary. Approval dies if recipient or content changes.</p></article>
+        <article><span>02</span><h3>Spend money</h3><p>Research freely. Merchant + exact amount are bounded. One approval, one payment, one receipt.</p></article>
+        <article><span>03</span><h3>Change or delete</h3><p>Work freely in the safe zone. Destructive actions and permission changes trigger enforcement and escape checks.</p></article>
+      </div>
+    </section>
+
+    <section className="pocFooterNote">
+      <strong>The product rule:</strong>
+      <p>Work freely inside the safe zone. Ask when the consequence matters. Then prove the agent did exactly what was allowed.</p>
+      <Link to="/app/evidence">Open technical evidence →</Link>
+    </section>
+  </div>
+}
 function RouteView({path,title}){if(path==='/app/agents')return <div className="routeCard"><h2>Your agents</h2><p>Demo records are explicitly sample data. Connected environments should replace these with engine-derived records.</p><ul className="agentList">{sampleAgents.map(a=><li key={a.id}><Link to={`/app/agents/${a.id}`}><strong>{a.name}</strong><div className="mono" style={{fontSize:11,color:'rgba(255,255,255,.45)',marginTop:6}}>{a.identity} · {a.status.toUpperCase()} · risk {a.risk}</div></Link></li>)}</ul></div>;if(path.startsWith('/app/agents/')){const id=path.split('/').pop();const a=sampleAgents.find(x=>x.id===id)||sampleAgents[0];return <div className="routeCard"><h2>{a.name}</h2><p>Identity: {a.identity}</p><p>Tools: {a.tools.join(', ')}</p><p>Data: {a.dataSources.join(', ')}</p><p>Destinations: {a.destinations.join(', ')}</p></div>}const copy={Authority:'Inspect connected agent → identity → tool → resource → action → data → destination paths. Sample paths are labeled as demo data.',Policies:'Declare what protected actions are allowed, denied, or require approval. Policy does not become enforcement until the action is routed through the gateway.',Verification:'Run boundary and regression checks against connected protected actions, then preserve verifiable evidence of the result.',Runtime:'Inspect ALLOW / DENY / APPROVE decisions produced by a connected enforcement runtime. Unavailable runtime state is shown as unavailable.',Releases:'Gate protected release workflows on policy and verification results without implying unrelated actions are controlled.', 'Live Alvira':'ALVIRA-connected engine state appears here only when the integration is reachable and explicitly reports engine-derived data.',Evidence:'Review signed decisions, downstream verification and proof records. Sample evidence and real proof remain visually distinct.'};return <div className="routeCard"><h2>{title}</h2><p>{copy[title]||'Workspace route preserved from the current production information architecture.'}</p><div className="statusPill">{statusLabels.demo}</div></div>}
 
 function App(){const [path,setPath]=useState(location.pathname);React.useEffect(()=>{const h=()=>setPath(location.pathname);addEventListener('popstate',h);return()=>removeEventListener('popstate',h)},[]);if(path==='/login')return <Auth/>;if(path==='/signup')return <Auth signup/>;if(path==='/how-it-works'||path==='/how-it-works/')return <HowItWorksPage/>;if(path==='/agent-controls'||path==='/agent-controls/')return <AgentControlsPage/>;if(path.startsWith('/app'))return <AppShell path={path}/>;return <Homepage/>}

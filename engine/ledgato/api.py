@@ -688,6 +688,30 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
 
+    @app.post("/v1/approvals/{approval_id}/approve-and-resume")
+    def approve_and_resume(
+        approval_id: str,
+        req: ApprovalDecisionRequest,
+        principal: Principal = Depends(_principal),
+    ):
+        _require_role(principal, allowed={"approver"}, action="approve and resume actions")
+        decided_by = _claim(principal, req.decided_by, field="decided_by")
+        try:
+            return gateway.approve_and_resume(
+                approval_id,
+                decided_by=decided_by,
+                reason=req.reason,
+                jit_ttl_seconds=req.jit_ttl_seconds if req.jit_ttl_seconds is not None else 60,
+            )
+        except KeyError as exc:
+            raise HTTPException(404, f"unknown approval '{approval_id}'") from exc
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(502, f"approved execution failed: {exc}") from exc
+
     @app.post("/v1/approvals/{approval_id}/deny")
     def deny_approval(
         approval_id: str, req: ApprovalDenyRequest, principal: Principal = Depends(_principal)
