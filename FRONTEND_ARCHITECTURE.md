@@ -92,6 +92,27 @@ Names may evolve, but the responsibilities should stay legible. Internal concept
 
 The default successful state should be quiet and legible, for example: no action required, governed actions completed automatically, verification status healthy. The console should demand attention only when an approval, drift, verification failure, or configuration problem requires the owner.
 
+## Authority interview UX
+
+The console should provide a guided authority interview for onboarding and later policy refinement.
+
+This is not a generic chat surface. Its primary purpose is to collect **explicit, structured authorization decisions** with minimal room for inference.
+
+UI requirements:
+
+- default to close-ended controls: single-select, multi-select, toggles, bounded numeric inputs, named-resource selectors, and explicit conditional choices;
+- show one consequential authority decision at a time;
+- always name the agent/principal, action, protected resource/environment, and condition when material;
+- do not preselect an authority-expanding answer from ALVIRA context;
+- ALVIRA-derived context may reorder, suppress, or propose questions, but any authority-expanding result requires an explicit user selection;
+- show a plain-language "this is what Ledgato will allow / require approval for / deny" review before policy activation;
+- distinguish proposed policy from active policy;
+- preserve unanswered/unknown states rather than filling gaps with inference;
+- provide an "Ask me each time" / approval-required path when the user does not want a standing grant;
+- let users revisit and amend prior answers without requiring them to edit YAML or raw policy documents.
+
+The interview should produce typed policy inputs suitable for the engine rather than relying on an LLM-generated prose summary as the source of truth.
+
 ## Runtime-status contract
 
 The frontend must receive or derive exactly one of these presentation states:
