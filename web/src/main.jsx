@@ -279,8 +279,8 @@ function Overview(){
     <section className="pocTopline">
       <div>
         <span className="pocKicker">CURRENT PRODUCT STATE</span>
-        <h2>No live runtime is connected. One bounded enforcement proof is verified.</h2>
-        <p>So this screen separates <b>real historical proof</b> from anything that would require a live agent. Nothing below is presented as current production enforcement.</p>
+        <h2>One bounded enforcement proof is verified. Live authority state appears only when the control path confirms it.</h2>
+        <p>This screen keeps <b>historical proof</b> separate from current owner + engine state. A connected approval below is live; the lab scenarios remain bounded historical evidence.</p>
       </div>
       <span className="pocBadge pending">{statusLabels.unavailable}</span>
     </section>
