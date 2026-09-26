@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from ledgato.api import create_app
+from ledgato.api import _default_adapters_from_env, create_app
 
 
 FENCE = """
@@ -299,6 +299,58 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
             "tool": "github.merge",
             "impact": "write",
             "domain": "workspace-command::abc",
+        },
+    })
+    assert escaped.status_code == 200
+    assert escaped.json()["outcome"] == "DENY"
+
+
+def test_default_github_adapter_never_inherits_generic_github_token(monkeypatch):
+    monkeypatch.setenv("LEDGATO_GITHUB_REPOSITORY", "tk-ap/agent-os")
+    monkeypatch.setenv("GITHUB_TOKEN", "generic-host-token")
+    monkeypatch.delenv("LEDGATO_GITHUB_TOKEN", raising=False)
+
+    assert "github" not in _default_adapters_from_env()
+
+    monkeypatch.setenv("LEDGATO_GITHUB_TOKEN", "ledgato-only-token")
+    adapters = _default_adapters_from_env()
+    assert adapters["github"].token == "ledgato-only-token"
+
+
+def test_agentos_runtime_fence_requires_approval_for_supported_github_mutations(tmp_path):
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "examples" / "agent-os-runtime-fence.yaml"
+    app = create_app(
+        config_path=source,
+        ledger_path=tmp_path / "ledger.jsonl",
+        key_dir=tmp_path / "keys",
+        authority_path=tmp_path / "authority.json",
+        approvals_path=tmp_path / "approvals.json",
+        adapters={},
+        require_auth=False,
+    )
+    local = TestClient(app)
+    for tool in ("github.pull.merge", "github.issue.comment"):
+        response = local.post("/v1/actions/check", json={
+            "agent": "agent-os-runtime",
+            "task_id": "task-1",
+            "action": {
+                "tool": tool,
+                "impact": "write",
+                "domain": "tk-ap/agent-os",
+            },
+        })
+        assert response.status_code == 200
+        assert response.json()["outcome"] == "APPROVE"
+        assert response.json()["allow"] is False
+
+    escaped = local.post("/v1/actions/check", json={
+        "agent": "agent-os-runtime",
+        "action": {
+            "tool": "github.repo.admin",
+            "impact": "write",
+            "domain": "tk-ap/agent-os",
         },
     })
     assert escaped.status_code == 200
