@@ -87,7 +87,9 @@ Examples:
 `BYPASS_FOUND`.
 
 Future live discovery should call this path when it observes material route or
-authority drift.
+authority drift. A drift entry starts a new verification epoch: pre-drift attack
+evidence remains in history but cannot be reused to restore VERIFIED. Fresh
+attack-family coverage and fresh provider/resource readback are required.
 
 ## Owner UI
 

@@ -167,20 +167,20 @@ const verifiedBoundaryScenarios=[
 
 const boundaryRecords=[
   {
-    id:'protected-resource-lab',
-    title:'Permit-enforced protected resource',
-    provider:'bounded local proof',
-    resource:'service::billing-api',
-    action:'release.deploy',
+    id:'github_lab_merge',
+    title:'GitHub merge enforcement boundary',
+    provider:'GitHub lab',
+    resource:'tk-ap/ledgato-enforcement-lab',
+    action:'github.pull.merge',
     status:'VERIFIED',
     statusClass:'verified',
-    scope:'Historical two-process lab only',
+    scope:'Historical verified lab boundary only',
     failureMode:'CLOSED',
-    credentialOwner:'LEDGATo signing authority; resource pins the verification key',
-    readback:'Resource effect log + persisted restart state',
+    credentialOwner:'LEDGATo-held lab credential; governed agent has no equivalent merge route',
+    readback:'GitHub provider readback confirmed the pull request remained unmerged after DENY',
     drift:'Not connected to a live deployment. Any material credential, adapter, identity, policy or route change requires re-verification.',
     families:[
-      ['DIRECT BYPASS','TESTED','No-permit, replay, retarget and forged-permit paths rejected'],
+      ['DIRECT BYPASS','TESTED','Alternate/direct-provider paths exercised in the documented boundary suite'],
       ['CREDENTIAL LEAKAGE','TESTED','Credential-isolation vectors exercised in the bounded proof program'],
       ['AUTHORITY ESCALATION','TESTED','Wrong identity / scope escalation paths rejected'],
       ['APPROVAL ABUSE','TESTED','Replay / exactly-once abuse class tested and remediated where found']

@@ -414,3 +414,80 @@ def test_breach_without_vector_is_never_auto_resolved(lab):
         summary="clean", outcome="rejected", protected_action_occurred=False,
         vector="anything")
     assert len(lab.get("github_lab_merge").unresolved_bypasses()) == 1
+
+
+# --- first-class owner/API summary + drift verification epochs -------------
+
+def test_verification_summary_starts_conservative(lab):
+    summary = lab.get("github_lab_merge").verification_summary()
+    assert summary["version"] == "ledgato.boundary-status/v1"
+    assert summary["bypass_status"] == "UNVERIFIED"
+    assert summary["coverage"]["covered_attack_families"] == []
+    assert summary["coverage"]["missing_attack_families"] == sorted([
+        "approval_abuse_attempt", "bypass_attempt", "escalation_attempt", "leakage_attempt"
+    ])
+    assert summary["coverage"]["provider_readback"] is False
+    assert summary["coverage"]["unresolved_bypasses"] == 0
+    assert summary["last_verified_at"] is None
+
+
+def test_verification_summary_reflects_full_verified_evidence(lab):
+    _full_suite(lab)
+    lab.set_status(
+        "github_lab_merge",
+        "VERIFIED",
+        attested_by="independent-reviewer",
+        justification="full attack-family coverage + provider readback",
+    )
+    summary = lab.get("github_lab_merge").verification_summary()
+    assert summary["bypass_status"] == "VERIFIED"
+    assert summary["coverage"]["missing_attack_families"] == []
+    assert summary["coverage"]["provider_readback"] is True
+    assert summary["coverage"]["evidence_count"] >= 6
+    assert summary["last_verified_at"]
+
+
+def test_material_drift_starts_a_fresh_verification_epoch(lab):
+    _full_suite(lab)
+    lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="j")
+    before = lab.get("github_lab_merge").verification_summary()
+    assert before["bypass_status"] == "VERIFIED"
+
+    boundary = lab.record_drift(
+        "github_lab_merge",
+        summary="gateway credential scope changed",
+        detail={"trigger": "credential_scope"},
+    )
+    assert boundary.bypass_status == "PARTIALLY_VERIFIED"
+
+    after = boundary.verification_summary()
+    assert after["last_verified_at"] == before["last_verified_at"]
+    assert after["last_drift_at"] is not None
+    assert after["coverage"]["covered_attack_families"] == []
+    assert after["coverage"]["provider_readback"] is False
+
+    with pytest.raises(ValueError, match="no bypass/leakage/escalation attempts"):
+        lab.set_status("github_lab_merge", "VERIFIED", attested_by="r", justification="old proof")
+
+    _full_suite(lab)
+    reverified = lab.set_status(
+        "github_lab_merge",
+        "VERIFIED",
+        attested_by="r",
+        justification="fresh post-drift attack suite + readback",
+    )
+    assert reverified.bypass_status == "VERIFIED"
+    assert reverified.verification_summary()["coverage"]["missing_attack_families"] == []
+
+
+def test_drift_never_clears_bypass_found(lab):
+    lab.record_evidence(
+        "github_lab_merge",
+        kind="bypass_attempt",
+        summary="direct provider route succeeded",
+        outcome="merged",
+        protected_action_occurred=True,
+        vector="direct-provider",
+    )
+    boundary = lab.record_drift("github_lab_merge", summary="adapter changed")
+    assert boundary.bypass_status == "BYPASS_FOUND"
