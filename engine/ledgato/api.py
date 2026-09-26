@@ -836,7 +836,7 @@ def create_app(
 def _default_adapters_from_env() -> dict[str, EnforcementAdapter]:
     adapters: dict[str, EnforcementAdapter] = {}
     repository = os.getenv("LEDGATO_GITHUB_REPOSITORY")
-    token = os.getenv("LEDGATO_GITHUB_TOKEN") or os.getenv("GITHUB_TOKEN")
+    # Provider mutation authority must be explicitly assigned to the Ledgato\n    # boundary. Never inherit a generic GitHub token from the surrounding host.\n    token = os.getenv("LEDGATO_GITHUB_TOKEN")
     if repository and token:
         adapters["github"] = GitHubAdapter(
             repository=repository,
