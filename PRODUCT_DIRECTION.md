@@ -192,13 +192,35 @@ The adapter does **not** make Ledgato the owner of the underlying protocol. Exis
 
 ### Initial protocol targets
 
-The first protocol adapters to design for are:
+The first protocol adapters are:
 
-1. **MCP** — tool/resource invocation boundaries. Ledgato can evaluate consequential MCP operations before invocation and preserve downstream verification evidence.
-2. **A2A** — agent-to-agent delegation boundaries. Ledgato should preserve the rule that delegation may narrow but never widen authority, scope, budget, context, tools, or time.
-3. **x402** — machine-payment boundaries. Ledgato can govern the authority to spend, including scoped budget/vendor/action constraints, without becoming the wallet or payment rail.
+1. **MCP** — tool/resource invocation boundaries. Ledgato can evaluate consequential MCP operations before invocation and preserve downstream verification evidence. **Directional target; not implemented support.**
+2. **A2A** — agent-to-agent delegation boundaries. Ledgato should preserve the rule that delegation may narrow but never widen authority, scope, budget, context, tools, or time. **Directional target; not implemented support.**
+3. **x402** — machine-payment boundaries. Ledgato governs the authority to spend without becoming the wallet or payment rail. The `x402.pay` adapter is **implemented and CI-tested** as of PR #60, but no production wallet is configured or funded and no live spending boundary is claimed.
 
-These are **directional adapter targets, not implemented-support claims**. They should use the same underlying action/authority contracts rather than creating protocol-specific authorization engines.
+All protocol adapters should use the same underlying action/authority contracts rather than creating protocol-specific authorization engines.
+
+### x402 activation and funding sequence
+
+x402 activation is intentionally **dormant until the POC-first milestone in #63 makes the existing GitHub enforcement boundary understandable and demonstrable**. Protocol breadth must not outrun proof of the core product.
+
+When x402 work resumes, activate it as a bounded second proof of the same enforcement model:
+
+1. create a **dedicated disposable EVM test wallet** used only for the x402 proof;
+2. enable **Base Sepolia only** for the first live test; do not authorize a mainnet network;
+3. choose **one x402 test resource** and add only its exact hostname to the adapter allowlist;
+4. configure a **very small hard spend ceiling** at the x402 SDK/adapter layer;
+5. fund the disposable wallet only with the **testnet asset/funds required by the selected Base Sepolia x402 resource**; do not fund a production/mainnet wallet for the first proof;
+6. configure the existing adapter through the protected gateway environment (`LEDGATO_X402_EVM_PRIVATE_KEY`, `LEDGATO_X402_ALLOWED_HOSTS`, `LEDGATO_X402_NETWORKS`, and the spend ceiling) without exposing reusable wallet material to the governed agent;
+7. record an end-to-end proof:
+   `agent requests purchase → Ledgato DENY or APPROVE → authorized resume → x402 payment/settlement → resource returned → settlement evidence recorded`;
+8. prove **DENY and pre-approval states produce zero signing/payment attempts**, and approval/resume executes at most once;
+9. verify the agent has **no alternate wallet, credential, transport, or direct payment path** that can bypass the Ledgato enforcement boundary;
+10. surface the result in the product using the same plain-language proof model as the GitHub boundary: what was attempted, what Ledgato decided, whether money moved, what resource was returned, how settlement was verified, and whether bypass/drift remains possible.
+
+Only after that bounded test is independently understandable and reproducible should a mainnet/funded-wallet decision be considered. That decision requires a separate explicit activation review covering credential custody, funding source, loss ceiling, revocation/rotation, supported vendors/assets/networks, settlement verification, and bypass assumptions.
+
+The x402 adapter is therefore **implemented capability, not activated spending authority**. Funding a wallet or setting production environment variables is an enforcement activation event, not routine configuration.
 
 ### Future interoperability targets
 
