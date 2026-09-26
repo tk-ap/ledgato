@@ -55,6 +55,19 @@ Before material authenticated-frontend work, read `FRONTEND_ARCHITECTURE.md` and
 
 A skill/prompt may help an agent understand Ledgato responses, but it is not an enforcement boundary. Prefer adapters, SDK/gateway hooks, or other execution-path controls that the agent cannot simply reason around.
 
+## Authority Interview Guardrail
+
+When designing or implementing onboarding, authority configuration, approval learning, or policy refinement, read the authority-interview section of `PRODUCT_DIRECTION.md`.
+
+Preserve these rules:
+
+- ALVIRA/context may decide what to ask, not what authority to grant;
+- use close-ended, typed questions for consequential authority whenever possible;
+- do not infer permission from user preference, conversational tone, historical context, or a different prior approval;
+- unanswered authority must not expand authority;
+- proposals derived from repeated approvals, context, or observed behavior require explicit confirmation before policy changes;
+- the activated source of truth is structured policy produced from explicit answers, not an LLM prose interpretation.
+
 ## Protocol Adapter Direction
 
 For MCP, A2A, x402, AP2, UCP, Visa TAP, AP4M, or other agent-protocol integration work, read the protocol-integration section of `PRODUCT_DIRECTION.md` before planning or implementation.
