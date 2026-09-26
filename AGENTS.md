@@ -45,6 +45,21 @@ These evaluate declared policy **at a boundary Ledgato enforces**. That is gover
 
 At completion of material work, report: product result, ecosystem implications, cross-product opportunities (subject to `policies/CROSS_MARKET_POLICY.md`), and a boundary check.
 
+## Protocol Adapter Direction
+
+For MCP, A2A, x402, AP2, UCP, Visa TAP, AP4M, or other agent-protocol integration work, read the protocol-integration section of `PRODUCT_DIRECTION.md` before planning or implementation.
+
+Treat MCP, A2A, and x402 as the first **directional adapter targets** and AP2, UCP, Visa TAP, and AP4M as future interoperability targets. None are implemented-support claims unless the repository's evidence table and runtime verification explicitly say otherwise.
+
+Protocol adapters must:
+
+- map protocol-native actions/evidence into the existing Ledgato boundary model rather than inventing a separate authorization engine;
+- preserve upstream authority provenance and consume applicable policy/authorization references;
+- never widen delegated authority, scope, budget, context, tools, or time;
+- keep reusable wallet/payment/provider credentials outside policy records;
+- preserve `ALLOW / DENY / APPROVE → enforce → verify → evidence` semantics at the protected boundary;
+- avoid displacing the current Agent Release Assurance / first-client enforcement proof without explicit reprioritization.
+
 ## Repository Safety
 
 - Start material work from current `main` on a task branch.
