@@ -155,6 +155,73 @@ Key question:
 
 > **Where are our authority boundaries too broad, too weak, too costly, or unnecessarily restrictive?**
 
+## Protocol integration direction: enforceable adapters, not protocol ownership
+
+Emerging agent protocols increasingly define how agents call tools, delegate work, buy services, and prove commercial intent. Ledgato should integrate at the **consequential boundary** these protocols expose rather than invent competing transport, payment, identity, or commerce standards.
+
+The architectural direction is:
+
+```text
+agent / runtime
+      ↓
+protocol adapter
+      ↓
+Ledgato boundary contract
+      ↓
+policy / authority evaluation
+      ↓
+ALLOW / DENY / APPROVE
+      ↓
+protocol-native execution
+      ↓
+receipt / result / verification evidence
+```
+
+A protocol adapter should normalize only the evidence needed for the existing Ledgato boundary model, including where available:
+
+- principal / agent identity and provenance;
+- delegated authority and upstream authorization reference;
+- requested action and target resource;
+- declared scope, budget, time, environment, and other constraints;
+- protocol-native mandate, credential, receipt, or proof material;
+- conditions requiring approval;
+- downstream execution result;
+- post-action verification evidence.
+
+The adapter does **not** make Ledgato the owner of the underlying protocol. Existing upstream identity, authorization, delegation, mandate, payment, and commerce semantics should be consumed where applicable rather than silently reissued or replaced.
+
+### Initial protocol targets
+
+The first protocol adapters to design for are:
+
+1. **MCP** — tool/resource invocation boundaries. Ledgato can evaluate consequential MCP operations before invocation and preserve downstream verification evidence.
+2. **A2A** — agent-to-agent delegation boundaries. Ledgato should preserve the rule that delegation may narrow but never widen authority, scope, budget, context, tools, or time.
+3. **x402** — machine-payment boundaries. Ledgato can govern the authority to spend, including scoped budget/vendor/action constraints, without becoming the wallet or payment rail.
+
+These are **directional adapter targets, not implemented-support claims**. They should use the same underlying action/authority contracts rather than creating protocol-specific authorization engines.
+
+### Future interoperability targets
+
+Design the adapter boundary so additional commerce/payment protocols can be supported without changing the core decision model. Current watch-list targets include:
+
+- **AP2** — payment authorization / mandate evidence;
+- **UCP** — agentic commerce lifecycle actions;
+- **Visa Trusted Agent Protocol (TAP)** — merchant-facing agent identity / authorization proof;
+- **Mastercard Agent Pay for Machines (AP4M)** — machine-to-machine payment authorization and execution.
+
+These are future interoperability targets only. Presence in this document does not mean the repository implements, deploys, or verifies them.
+
+### Guardrails
+
+- Protocol support must be **adapter-based** and reuse the canonical Ledgato boundary contracts wherever possible.
+- A protocol adapter may translate a native request into a Ledgato decision envelope; it must not quietly broaden the user's or agent's authority.
+- Wallet keys, payment credentials, provider secrets, and equivalent reusable credentials remain outside Ledgato policy records and should stay with the appropriate protected adapter/host.
+- An upstream authorization, mandate, identity assertion, or protocol credential is evidence/input; it does not by itself prove that the requested action satisfies Ledgato policy.
+- An `ALLOW` decision is not proof of enforcement. Support claims still require evidence that the adapter was in the real execution path, the protected action respected the decision, bypass was not available within the tested boundary, and the downstream result was verified.
+- The existing Agent Release Assurance / first-client enforcement proof remains the current wedge. Protocol-adapter work should not displace that proof target without an explicit reprioritization decision.
+
+This direction makes Ledgato a **protocol-agnostic governance/enforcement layer at protected boundaries**, not a universal authorization service and not a replacement for MCP, A2A, payment rails, commerce protocols, IAM, or Agent OS.
+
 ## First concrete wedge: Agent Release Assurance
 
 GitHub/CI release gating remains a strong first wedge because it is legible, consequential, and already has a native approval/check surface.
