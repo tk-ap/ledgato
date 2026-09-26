@@ -175,6 +175,58 @@ class EnforcementBoundary:
         return unresolved
 
 
+    def verification_summary(self) -> dict[str, Any]:
+        """Return the owner/API-facing verification state for this boundary.
+
+        This is deliberately derived from append-only evidence. It does not
+        invent a second status system and it cannot promote a boundary.
+        """
+        attempts = self.bypass_attempts()
+        tested = {e.kind for e in attempts}
+        provider_readbacks = [
+            e for e in self.verification_evidence if e.kind == "provider_readback"
+        ]
+        status_changes = [
+            e for e in self.verification_evidence if e.kind == "status_change"
+        ]
+        verified_changes = [e for e in status_changes if e.outcome == "VERIFIED"]
+        bypasses = self.successful_bypasses()
+        drift = [e for e in self.verification_evidence if e.kind == "drift"]
+
+        families: dict[str, dict[str, int]] = {}
+        for family in sorted(REQUIRED_ATTACK_FAMILIES):
+            rows = [e for e in attempts if e.kind == family]
+            families[family] = {
+                "attempts": len(rows),
+                "blocked": sum(e.protected_action_occurred is False for e in rows),
+                "bypasses": sum(e.protected_action_occurred is True for e in rows),
+            }
+
+        return {
+            "version": "ledgato.boundary-status/v1",
+            "id": self.id,
+            "provider": self.provider,
+            "resource": self.resource,
+            "action": self.action,
+            "bypass_status": self.bypass_status,
+            "failure_mode": self.failure_mode,
+            "gateway_credential_owner": self.gateway_credential_owner,
+            "coverage": {
+                "attack_families": families,
+                "covered_attack_families": sorted(tested & REQUIRED_ATTACK_FAMILIES),
+                "missing_attack_families": sorted(REQUIRED_ATTACK_FAMILIES - tested),
+                "tested_vectors": sorted({e.vector for e in attempts if e.vector}),
+                "unresolved_bypasses": len(self.unresolved_bypasses()),
+                "provider_readback": bool(provider_readbacks),
+                "evidence_count": len(self.verification_evidence),
+            },
+            "last_verified_at": verified_changes[-1].recorded_at if verified_changes else None,
+            "last_bypass_at": bypasses[-1].recorded_at if bypasses else None,
+            "last_drift_at": drift[-1].recorded_at if drift else None,
+            "notes": self.notes,
+        }
+
+
 class BoundaryStore:
     """File-backed registry of enforcement boundaries.
 
@@ -316,6 +368,40 @@ class BoundaryStore:
             ledger_entry_id=ledger_entry_id,
             detail=detail or {},
         )
+
+    def record_drift(
+        self,
+        boundary_id: str,
+        *,
+        summary: str,
+        detail: dict[str, Any] | None = None,
+    ) -> EnforcementBoundary:
+        """Record material deployment/integration drift and weaken stale proof.
+
+        Drift can only weaken a claim automatically. It never promotes a
+        boundary, clears BYPASS_FOUND, or grants authority.
+        """
+        boundary = self.record_evidence(
+            boundary_id,
+            kind="drift",
+            summary=summary,
+            outcome="verification_invalidated",
+            protected_action_occurred=None,
+            detail=detail or {},
+        )
+        if boundary.bypass_status == "VERIFIED":
+            boundary.bypass_status = "PARTIALLY_VERIFIED"
+            boundary.updated_at = utcnow().isoformat()
+            boundary.verification_evidence.append(
+                BoundaryEvidence(
+                    kind="status_change",
+                    summary="VERIFIED weakened to PARTIALLY_VERIFIED after material drift",
+                    outcome="PARTIALLY_VERIFIED",
+                    detail={"reason": summary},
+                )
+            )
+            self._save()
+        return boundary
 
     # -- status --------------------------------------------------------
 

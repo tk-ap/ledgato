@@ -8,9 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:claims": "node tests/claim-boundary.mjs",
-    "test": "npm run test:claims && npm run test:owner-session && npm run test:progressive-authority",
+    "test": "npm run test:claims && npm run test:owner-session && npm run test:progressive-authority && npm run test:boundary-object",
     "test:owner-session": "node tests/owner-session-boundary.mjs",
-    "test:progressive-authority": "node tests/progressive-authority-boundary.mjs"
+    "test:progressive-authority": "node tests/progressive-authority-boundary.mjs",
+    "test:boundary-object": "node tests/boundary-object.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

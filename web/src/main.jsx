@@ -3,7 +3,7 @@ import {createRoot} from 'react-dom/client'
 import {claims,statusLabels} from './content/claims.js'
 import './styles.css'
 
-const appRoutes=[['/app','Overview'],['/app/agents','Agents'],['/app/authority','Authority'],['/app/policies','Policies'],['/app/verification','Verification'],['/app/runtime','Runtime'],['/app/releases','Releases'],['/app/alvira','Live Alvira'],['/app/evidence','Evidence']]
+const appRoutes=[['/app','Overview'],['/app/agents','Agents'],['/app/boundaries','Boundaries'],['/app/authority','Authority'],['/app/policies','Policies'],['/app/verification','Verification'],['/app/runtime','Runtime'],['/app/releases','Releases'],['/app/alvira','Live Alvira'],['/app/evidence','Evidence']]
 const sampleAgents=[{id:'support-bot',name:'support-bot',identity:'svc-support',status:'protected',risk:'medium',tools:['crm.search','billing.read','ticket.create','email.send'],dataSources:['Customer.email'],destinations:['approved-api']},{id:'release-agent',name:'release-agent',identity:'github-app',status:'review',risk:'high',tools:['github.pull.create','github.check.read'],dataSources:['repository'],destinations:['github.com']}]
 
 function go(path){history.pushState({},'',path);window.dispatchEvent(new PopStateEvent('popstate'))}
@@ -164,6 +164,79 @@ const verifiedBoundaryScenarios=[
   }
 ]
 
+
+const boundaryRecords=[
+  {
+    id:'protected-resource-lab',
+    title:'Permit-enforced protected resource',
+    provider:'bounded local proof',
+    resource:'service::billing-api',
+    action:'release.deploy',
+    status:'VERIFIED',
+    statusClass:'verified',
+    scope:'Historical two-process lab only',
+    failureMode:'CLOSED',
+    credentialOwner:'LEDGATo signing authority; resource pins the verification key',
+    readback:'Resource effect log + persisted restart state',
+    drift:'Not connected to a live deployment. Any material credential, adapter, identity, policy or route change requires re-verification.',
+    families:[
+      ['DIRECT BYPASS','TESTED','No-permit, replay, retarget and forged-permit paths rejected'],
+      ['CREDENTIAL LEAKAGE','TESTED','Credential-isolation vectors exercised in the bounded proof program'],
+      ['AUTHORITY ESCALATION','TESTED','Wrong identity / scope escalation paths rejected'],
+      ['APPROVAL ABUSE','TESTED','Replay / exactly-once abuse class tested and remediated where found']
+    ]
+  }
+]
+
+function BoundariesView(){
+  return <div className="boundaryRegistry">
+    <section className="boundaryRegistryIntro">
+      <div>
+        <span className="pocKicker">FIRST-CLASS ENFORCEMENT OBJECT</span>
+        <h2>A boundary is the unit LEDGATo is allowed to call verified.</h2>
+        <p>Not an agent. Not a policy. Not the whole system. Each record names one protected action, the resource that performs it, how failure behaves, and the evidence required to show the agent could not route around it under the tested conditions.</p>
+      </div>
+      <span className="pocBadge verified">1 VERIFIED · LAB</span>
+    </section>
+
+    {boundaryRecords.map(boundary=><article className="boundaryRecord" key={boundary.id}>
+      <div className="boundaryRecordHead">
+        <div>
+          <span className="pocKicker">{boundary.scope}</span>
+          <h2>{boundary.title}</h2>
+          <code>{boundary.id}</code>
+        </div>
+        <span className={'pocBadge '+boundary.statusClass}>{boundary.status} · SCOPED</span>
+      </div>
+      <div className="boundaryIdentity">
+        <div><small>ACTION</small><strong>{boundary.action}</strong></div>
+        <div><small>RESOURCE</small><strong>{boundary.resource}</strong></div>
+        <div><small>FAILURE</small><strong>{boundary.failureMode}</strong></div>
+        <div><small>CREDENTIAL / PERMIT TRUST</small><strong>{boundary.credentialOwner}</strong></div>
+      </div>
+      <div className="boundaryFamilyGrid">
+        {boundary.families.map(row=><div key={row[0]}><small>{row[0]}</small><b>{row[1]}</b><span>{row[2]}</span></div>)}
+      </div>
+      <div className="boundaryTruth">
+        <div><small>INDEPENDENT READBACK</small><strong>{boundary.readback}</strong></div>
+        <div><small>DRIFT / RE-VERIFICATION</small><strong>{boundary.drift}</strong></div>
+      </div>
+    </article>)}
+
+    <section className="boundaryRules">
+      <article><span className="pocKicker">WHAT VERIFIED MEANS</span><h3>VERIFIED applies to this boundary only.</h3><p>It means the named action/resource pair survived the required attack families and independent readback in the recorded environment. It is not a claim that the agent, runtime, provider, or LEDGATo globally cannot be escaped.</p></article>
+      <article><span className="pocKicker">WHAT CHANGES THE CLAIM</span><h3>Material drift automatically weakens this claim.</h3><p>Credential scope, adapter behavior, identity binding, policy digest, delegation, resource enforcement or alternate route changes require the boundary to be attacked again before the stronger claim returns.</p></article>
+      <article><span className="pocKicker">THE PRODUCT TEST</span><h3>No valid permit or decision path means no protected effect.</h3><p>If another credential, network route, inherited session or delegated worker can produce the same effect outside this boundary, the boundary is not fully verified.</p></article>
+    </section>
+
+    <section className="pocFooterNote">
+      <strong>Next step:</strong>
+      <p>Connect runtime discovery so this registry can compare declared boundaries with the routes and credentials the agent can actually reach, then automatically invalidate stale proof when material drift appears.</p>
+      <Link to="/app/verification">Run / inspect verification →</Link>
+    </section>
+  </div>
+}
+
 function AppShell({path}){const title=useMemo(()=>appRoutes.find(([p])=>p===path)?.[1]||(path.startsWith('/app/agents/')?'Agent':'Overview'),[path]);return <div className="appShell"><aside className="side"><div className="brand">LEDGAT<b>o</b></div>{appRoutes.map(([p,l])=><Link key={p} to={p} className={path===p?'active':''}>{l}</Link>)}</aside><main className="appMain"><div className="eyebrow">{title==='Overview'?'CONTROL CENTER':'LEDGATO WORKSPACE'}</div><h1>{title==='Overview'?'What happened. What can happen next.':title}</h1>{title==='Overview'?<Overview/>:<RouteView path={path} title={title}/>}</main></div>}
 
 
@@ -316,7 +389,7 @@ function Overview(){
         <span className="pocKicker">CAN IT GO AROUND THE RULE?</span>
         <h3>{scenario.bypass}</h3>
         <p>The protected resource itself requires a valid LEDGATo-signed, one-use permit bound to the exact request. The agent cannot create that permit itself.</p>
-        <Link to="/app/verification">Inspect boundary proof →</Link>
+        <Link to="/app/boundaries">Open boundary record →</Link>
       </article>
       <article className="boundaryCard">
         <span className="pocKicker">HAS THE BOUNDARY DRIFTED?</span>
@@ -358,7 +431,7 @@ function Overview(){
     </section>
   </div>
 }
-function RouteView({path,title}){if(path==='/app/agents')return <div className="routeCard"><h2>Your agents</h2><p>Demo records are explicitly sample data. Connected environments should replace these with engine-derived records.</p><ul className="agentList">{sampleAgents.map(a=><li key={a.id}><Link to={`/app/agents/${a.id}`}><strong>{a.name}</strong><div className="mono" style={{fontSize:11,color:'rgba(255,255,255,.45)',marginTop:6}}>{a.identity} · {a.status.toUpperCase()} · risk {a.risk}</div></Link></li>)}</ul></div>;if(path.startsWith('/app/agents/')){const id=path.split('/').pop();const a=sampleAgents.find(x=>x.id===id)||sampleAgents[0];return <div className="routeCard"><h2>{a.name}</h2><p>Identity: {a.identity}</p><p>Tools: {a.tools.join(', ')}</p><p>Data: {a.dataSources.join(', ')}</p><p>Destinations: {a.destinations.join(', ')}</p></div>}const copy={Authority:'Inspect connected agent → identity → tool → resource → action → data → destination paths. Sample paths are labeled as demo data.',Policies:'Declare what protected actions are allowed, denied, or require approval. Policy does not become enforcement until the action is routed through the gateway.',Verification:'Run boundary and regression checks against connected protected actions, then preserve verifiable evidence of the result.',Runtime:'Inspect ALLOW / DENY / APPROVE decisions produced by a connected enforcement runtime. Unavailable runtime state is shown as unavailable.',Releases:'Gate protected release workflows on policy and verification results without implying unrelated actions are controlled.', 'Live Alvira':'ALVIRA-connected engine state appears here only when the integration is reachable and explicitly reports engine-derived data.',Evidence:'Review signed decisions, downstream verification and proof records. Sample evidence and real proof remain visually distinct.'};return <div className="routeCard"><h2>{title}</h2><p>{copy[title]||'Workspace route preserved from the current production information architecture.'}</p><div className="statusPill">{statusLabels.demo}</div></div>}
+function RouteView({path,title}){if(path==='/app/boundaries')return <BoundariesView/>;if(path==='/app/agents')return <div className="routeCard"><h2>Your agents</h2><p>Demo records are explicitly sample data. Connected environments should replace these with engine-derived records.</p><ul className="agentList">{sampleAgents.map(a=><li key={a.id}><Link to={`/app/agents/${a.id}`}><strong>{a.name}</strong><div className="mono" style={{fontSize:11,color:'rgba(255,255,255,.45)',marginTop:6}}>{a.identity} · {a.status.toUpperCase()} · risk {a.risk}</div></Link></li>)}</ul></div>;if(path.startsWith('/app/agents/')){const id=path.split('/').pop();const a=sampleAgents.find(x=>x.id===id)||sampleAgents[0];return <div className="routeCard"><h2>{a.name}</h2><p>Identity: {a.identity}</p><p>Tools: {a.tools.join(', ')}</p><p>Data: {a.dataSources.join(', ')}</p><p>Destinations: {a.destinations.join(', ')}</p></div>}const copy={Authority:'Inspect connected agent → identity → tool → resource → action → data → destination paths. Sample paths are labeled as demo data.',Policies:'Declare what protected actions are allowed, denied, or require approval. Policy does not become enforcement until the action is routed through the gateway.',Verification:'Run boundary and regression checks against connected protected actions, then preserve verifiable evidence of the result.',Runtime:'Inspect ALLOW / DENY / APPROVE decisions produced by a connected enforcement runtime. Unavailable runtime state is shown as unavailable.',Releases:'Gate protected release workflows on policy and verification results without implying unrelated actions are controlled.', 'Live Alvira':'ALVIRA-connected engine state appears here only when the integration is reachable and explicitly reports engine-derived data.',Evidence:'Review signed decisions, downstream verification and proof records. Sample evidence and real proof remain visually distinct.'};return <div className="routeCard"><h2>{title}</h2><p>{copy[title]||'Workspace route preserved from the current production information architecture.'}</p><div className="statusPill">{statusLabels.demo}</div></div>}
 
 function App(){const [path,setPath]=useState(location.pathname);React.useEffect(()=>{const h=()=>setPath(location.pathname);addEventListener('popstate',h);return()=>removeEventListener('popstate',h)},[]);if(path==='/login')return <Auth/>;if(path==='/signup')return <Auth signup/>;if(path==='/how-it-works'||path==='/how-it-works/')return <HowItWorksPage/>;if(path==='/agent-controls'||path==='/agent-controls/')return <AgentControlsPage/>;if(path.startsWith('/app'))return <AppShell path={path}/>;return <Homepage/>}
 
