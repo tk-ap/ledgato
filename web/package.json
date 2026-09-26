@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:claims": "node tests/claim-boundary.mjs",
-    "test": "npm run test:claims"
+    "test": "npm run test:claims && npm run test:public-navigation",
+    "test:public-navigation": "node tests/public-navigation.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
