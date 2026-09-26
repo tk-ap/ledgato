@@ -217,3 +217,21 @@ def test_gateway_allow_invokes_x402_once_and_records_settlement(tmp_path, paymen
     assert result["verification"]["verified"] is True
     assert replay["idempotent_replay"] is True
     assert len(client.calls) == 1
+
+
+def test_official_x402_sdk_surface_matches_adapter_expectations():
+    from x402 import x402ClientSync
+    from x402.http import x402HTTPClientSync
+    from x402.http.clients import x402_requests
+    from x402.mechanisms.evm import EthAccountSigner
+    from x402.mechanisms.evm.exact.register import register_exact_evm_client
+
+    client = x402ClientSync().set_spend_controls(
+        {"max_amount_per_payment": "$0.01"}
+    )
+    http_client = x402HTTPClientSync(client)
+
+    assert callable(x402_requests)
+    assert callable(register_exact_evm_client)
+    assert EthAccountSigner is not None
+    assert http_client is not None
