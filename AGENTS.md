@@ -45,6 +45,56 @@ These evaluate declared policy **at a boundary Ledgato enforces**. That is gover
 
 At completion of material work, report: product result, ecosystem implications, cross-product opportunities (subject to `policies/CROSS_MARKET_POLICY.md`), and a boundary check.
 
+## Product Delivery Invariant
+
+Ledgato enforcement must not depend on the user keeping the website open. Treat the browser UI as a control room for configuration, approvals, protected-system status, activity/evidence, policies, and integrations—not as the runtime that activates or sustains governance.
+
+Before material authenticated-frontend work, read `FRONTEND_ARCHITECTURE.md` and preserve this invariant:
+
+> **Closing the Ledgato tab must not weaken, disable, or pause an already configured enforcement boundary.**
+
+A skill/prompt may help an agent understand Ledgato responses, but it is not an enforcement boundary. Prefer adapters, SDK/gateway hooks, or other execution-path controls that the agent cannot simply reason around.
+
+## Progressive Authority Calibration Guardrail
+
+When designing or implementing onboarding, authority configuration, approval learning, or policy refinement, read the Progressive Authority Calibration section of `PRODUCT_DIRECTION.md`.
+
+Preserve these rules:
+
+- do not require a comprehensive upfront authority interview when a minimal safe baseline plus contextual decisions can resolve authority more accurately;
+- ALVIRA/context may decide what to ask, not what authority to grant;
+- use close-ended, typed questions for consequential authority whenever possible;
+- unknown/unanswered consequential authority must not expand authority;
+- contextual approvals should be scoped by principal, action, resource, conditions, duration/expiry, and delegation where applicable;
+- valid approval/resume should return control to the originating autonomous workflow rather than requiring the user to operate Ledgato continuously;
+- repeated approvals may generate a proposed standing rule, but must never silently broaden active policy;
+- the activated source of truth is structured authority produced from explicit answers, not an LLM prose interpretation.
+
+## Jev Pre-Decision Guardrail
+
+For Jev-related work, read `JEV_PREDECISION_BOOTSTRAP.md` and the Jev section of `PRODUCT_DIRECTION.md`.
+
+Jev is advisory pre-decision intelligence only. It may classify requests, match candidate policy, detect novelty, identify missing authority dimensions, select minimal contextual questions, and propose narrow rule refinements. It may not grant authority, issue permits, activate policy, or return the authoritative enforcement decision.
+
+Do not promote Jev into a live enforcement path until its benchmark is run and the architecture preserves a deterministic Ledgato policy decision between Jev output and execution.
+
+## Protocol Adapter Direction
+
+For MCP, A2A, x402, AP2, UCP, Visa TAP, AP4M, or other agent-protocol integration work, read the protocol-integration section of `PRODUCT_DIRECTION.md` before planning or implementation.
+
+Treat MCP and A2A as the first **directional adapter targets**. Treat x402 as an **implemented but dormant adapter**: code/tests exist, but wallet activation, funding, and a live spending proof are deferred until the POC-first milestone in #63. AP2, UCP, Visa TAP, and AP4M remain future interoperability targets. Never infer activated support from design direction alone; use the repository evidence table and runtime verification state.
+
+Protocol adapters must:
+
+- map protocol-native actions/evidence into the existing Ledgato boundary model rather than inventing a separate authorization engine;
+- preserve upstream authority provenance and consume applicable policy/authorization references;
+- never widen delegated authority, scope, budget, context, tools, or time;
+- keep reusable wallet/payment/provider credentials outside policy records;
+- preserve `ALLOW / DENY / APPROVE → enforce → verify → evidence` semantics at the protected boundary;
+- treat wallet funding, production network enablement, or production credential configuration as an **enforcement activation event** requiring explicit review rather than routine setup;
+- for x402, follow the deferred test-wallet/Base-Sepolia/single-resource/tiny-cap activation sequence in `PRODUCT_DIRECTION.md` after #63;
+- avoid displacing the current Agent Release Assurance / first-client enforcement proof without explicit reprioritization.
+
 ## Repository Safety
 
 - Start material work from current `main` on a task branch.

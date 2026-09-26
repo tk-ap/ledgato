@@ -38,6 +38,31 @@ Ledgato's stronger product claim is:
 
 That active intervention is the product.
 
+## Runtime vs. control room
+
+Ledgato is not a website that an operator must keep open.
+
+Its enforcement value lives in the execution path between an agent and a consequential capability. The web console configures and explains that system; it does not keep it alive.
+
+A useful product split is:
+
+- **engine** — decision + evidence;
+- **adapter/gateway** — non-bypassable execution boundary;
+- **console** — policy, approvals, integrations, activity, and proof;
+- **optional agent kit/skill** — teaches agents how to interact with Ledgato, but never substitutes for enforcement.
+
+A valid autonomous integration should continue to enforce the same policy after the user closes the browser.
+
+## Authority calibration
+
+Ledgato should establish only the minimum useful standing authority up front, then resolve new consequential boundaries in context.
+
+A healthy operating loop is:
+
+`minimal baseline → autonomous work → contextual approval when needed → scoped authority record → automatic resume → verification → explicit policy refinement`
+
+The system may learn what rule to **propose** from repeated decisions, but it may not infer or silently expand authority. Unknown consequential authority remains denied or approval-required according to policy until explicitly resolved.
+
 ## Product test
 
 When evaluating a proposed feature, integration, claim, or design, ask:
