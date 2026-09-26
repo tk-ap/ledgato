@@ -11,7 +11,7 @@ if(!ui.includes('A boundary is the unit LEDGATo is allowed to call verified.')) 
 if(!ui.includes('VERIFIED applies to this boundary only.')) fail('owner UI must prevent global VERIFIED interpretation')
 if(!ui.includes('Material drift automatically weakens this claim.')) fail('owner UI must explain re-verification after drift')
 if(!ui.includes('No valid permit or decision path means no protected effect.')) fail('owner UI must state the enforcement invariant')
-if(!ui.includes('Historical two-process lab only')) fail('historical proof must remain visibly bounded')
+if(!ui.includes('Historical verified lab boundary only')) fail('historical proof must remain visibly bounded')
 if(ui.includes('SYSTEM · VERIFIED')||ui.includes('ESCAPE-PROOF SYSTEM')) fail('UI must not imply global escape-proof verification')
 
 console.log('boundary-object: ok')
