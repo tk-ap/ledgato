@@ -45,6 +45,16 @@ These evaluate declared policy **at a boundary Ledgato enforces**. That is gover
 
 At completion of material work, report: product result, ecosystem implications, cross-product opportunities (subject to `policies/CROSS_MARKET_POLICY.md`), and a boundary check.
 
+## Product Delivery Invariant
+
+Ledgato enforcement must not depend on the user keeping the website open. Treat the browser UI as a control room for configuration, approvals, protected-system status, activity/evidence, policies, and integrations—not as the runtime that activates or sustains governance.
+
+Before material authenticated-frontend work, read `FRONTEND_ARCHITECTURE.md` and preserve this invariant:
+
+> **Closing the Ledgato tab must not weaken, disable, or pause an already configured enforcement boundary.**
+
+A skill/prompt may help an agent understand Ledgato responses, but it is not an enforcement boundary. Prefer adapters, SDK/gateway hooks, or other execution-path controls that the agent cannot simply reason around.
+
 ## Protocol Adapter Direction
 
 For MCP, A2A, x402, AP2, UCP, Visa TAP, AP4M, or other agent-protocol integration work, read the protocol-integration section of `PRODUCT_DIRECTION.md` before planning or implementation.
