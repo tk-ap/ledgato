@@ -1,0 +1,15 @@
+policies:
+  - agent: coding-agent
+    allow_tool:
+      - github.repo.read
+      - github.issue.comment
+      - github.pull.merge
+    deny_tool: []
+    approve_tool:
+      - github.pull.merge
+    impact_max: destructive
+    data_domains:
+      - github::owner/repo
+    require_grant: false
+    on_deny:
+      - alert

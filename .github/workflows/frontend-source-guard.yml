@@ -1,0 +1,62 @@
+name: Frontend source guard
+
+on:
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'package.json'
+      - 'vercel.json'
+      - '.github/workflows/frontend-source-guard.yml'
+      - 'scripts/**'
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'package.json'
+      - 'vercel.json'
+      - '.github/workflows/frontend-source-guard.yml'
+      - 'scripts/**'
+
+jobs:
+  no-historical-deployment-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject historical Ledgato deployment as build source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE --exclude-dir=.git --exclude='FRONTEND_ARCHITECTURE.md' --exclude='*.md' \
+            'ledgato-[a-z0-9]+-alvira2\.vercel\.app|ledgato-47k586kdi-alvira2\.vercel\.app' \
+            web package.json vercel.json scripts 2>/dev/null; then
+            echo 'Historical Vercel deployment URLs may be reference fixtures only, never frontend build/runtime dependencies.' >&2
+            exit 1
+          fi
+
+  claim-boundary-source-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject known universal live/enforcement copy in frontend source
+        shell: bash
+        run: |
+          set -euo pipefail
+          roots=()
+          [[ -d web ]] && roots+=(web)
+          [[ -f package.json ]] && roots+=(package.json)
+          [[ ${#roots[@]} -eq 0 ]] && exit 0
+
+          forbidden=(
+            'LIVE · ENFORCING POLICY'
+            'If it can reach your stack, Ledgato can see it.'
+            'Anything that escapes, drifts, or exfiltrates is caught and blocked before release.'
+          )
+
+          failed=0
+          for phrase in "${forbidden[@]}"; do
+            if grep -RIFn --exclude-dir=node_modules -- "$phrase" "${roots[@]}"; then
+              echo "Forbidden broad claim found: $phrase" >&2
+              failed=1
+            fi
+          done
+          exit "$failed"

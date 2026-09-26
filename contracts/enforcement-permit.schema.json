@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-os.local/contracts/enforcement-permit.schema.json",
+  "title": "Ledgato Enforcement Permit",
+  "description": "Issued by Ledgato only on ALLOW. Ed25519 signature by issuer_public_key over the canonical JSON of every field except signature. Single use: the protected resource burns permit_id before acting. Verified by engine/ledgato/enforcement.py::verify_permit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "permit_id", "decision_id", "contract_digest", "work_id", "agent_id", "action", "resource", "ledger_entry_id", "ledger_entry_hash", "issued_at", "expires_at", "issuer_public_key", "signature"],
+  "properties": {
+    "version": {"const": "ledgato.permit/v1"},
+    "permit_id": {"type": "string"},
+    "decision_id": {"type": "string"},
+    "contract_digest": {"type": "string", "description": "SHA-256 of the canonical action contract."},
+    "work_id": {"type": "string"},
+    "agent_id": {"type": "string"},
+    "action": {"type": "string"},
+    "resource": {"type": "string"},
+    "ledger_entry_id": {"type": "string"},
+    "ledger_entry_hash": {"type": "string", "description": "Hash of the signed ledger entry that recorded the ALLOW."},
+    "issued_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "issuer_public_key": {"type": "string", "description": "Base64 Ed25519 key. Must be pinned by the resource."},
+    "signature": {"type": "string"}
+  }
+}

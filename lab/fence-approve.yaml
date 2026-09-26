@@ -1,0 +1,9 @@
+policies:
+  - agent: lab-agent
+    allow_tool:
+      - github.repo.read
+      - github.issue.comment
+      - github.pull.merge
+    approve_tool:
+      - github.pull.merge
+    impact_max: destructive

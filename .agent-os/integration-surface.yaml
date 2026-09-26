@@ -3,6 +3,9 @@ product_key: ledgato
 agent_os_repository: tk-ap/agent-os
 routing_source: registry/product-routing.yaml
 
+# Contract paths without `repository:` resolve in tk-ap/agent-os.
+# Entries with `repository: tk-ap/ledgato` are local contracts implemented here.
+
 inbound:
   - from: agent-os-workforce
     contract: contracts/capability-manifest.schema.json
@@ -10,11 +13,36 @@ inbound:
   - from: agent-os-workforce
     contract: contracts/work-item.schema.json
     purpose: receive an explicitly scoped governance/enforcement work item rather than generic sensitive work
+  - from: agent-os-workforce
+    repository: tk-ap/ledgato
+    contract: contracts/action-contract.schema.json
+    purpose: mandatory checkpoint for one consequential action at an enforced boundary (POST /v1/enforcement/decide)
+    evidence_state: implemented, tested, lab-verified; not deployed
+  - from: agent-os-workforce
+    repository: tk-ap/ledgato
+    contract: contracts/authority-request.schema.json
+    purpose: evaluate declared authority for governed work against the applicable policy (POST /v1/authority/resolve)
+    evidence_state: implemented, tested; status store is in-memory
 
 outbound:
   - to: agent-os-workforce
     contract: contracts/outcome-event.schema.json
     trigger: a gate, probe, attestation, drift check, or enforcement evaluation produces verifiable evidence
+  - to: agent-os-workforce
+    repository: tk-ap/ledgato
+    contract: contracts/enforcement-permit.schema.json
+    trigger: an action contract is allowed; the permit is the only thing the protected resource accepts
+    evidence_state: implemented, tested, lab-verified; not deployed
+  - to: agent-os-workforce
+    repository: tk-ap/ledgato
+    contract: contracts/authority-decision.schema.json
+    trigger: an authority request is evaluated
+    evidence_state: implemented, tested
+  - to: ailhat
+    repository: tk-ap/ledgato
+    contract: contracts/authority-status.schema.json
+    trigger: readiness state for a work item changes (GET /v1/authority/status/{work_id})
+    evidence_state: implemented, tested; in-memory, lost on restart
 
 cross_market: []
 

@@ -31,6 +31,20 @@ Do not claim production enforcement merely because a CLI/API path or test suite 
 
 Signed or tamper-evident evidence proves only what its verification actually establishes; it does not grant task authority by itself.
 
+## Implemented Integration Surface
+
+These exist in this repository. Report them at the evidence state shown, not higher.
+
+| Surface | Where | Evidence state |
+|---|---|---|
+| Consequential-action checkpoint: action contract → decision → single-use signed permit → protected resource | `POST /v1/enforcement/decide`, `engine/ledgato/enforcement.py`, `protected_resource.py`, `integrations/protected_executor.py`, `contracts/action-contract.schema.json`, `contracts/enforcement-permit.schema.json` | implemented, tested, verified in a local two-process lab (`engine/ENFORCEMENT_BOUNDARY_PROOF.md`); **not deployed, not adopted by agent-os** |
+| Authority resolution for declared governed work | `POST /v1/authority/resolve`, `GET /v1/authority/status/{work_id}`, `contracts/authority-*.schema.json`, `contracts/capability-manifest.schema.json` | implemented, tested; status is in-memory |
+| Enforcement gateway with adapter-held credentials | `POST /v1/gateway/execute`, `engine/ENFORCEMENT.md` | implemented, tested; GitHub merge denial independently verified in a lab repository |
+
+These evaluate declared policy **at a boundary Ledgato enforces**. That is governance/enforcement, not generic authorization intelligence: Ledgato does not become the ecosystem-wide owner of whether any action is allowed. Where an applicable authority/policy reference exists upstream, consume it rather than replacing it.
+
+At completion of material work, report: product result, ecosystem implications, cross-product opportunities (subject to `policies/CROSS_MARKET_POLICY.md`), and a boundary check.
+
 ## Repository Safety
 
 - Start material work from current `main` on a task branch.

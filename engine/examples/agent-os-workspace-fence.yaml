@@ -1,0 +1,24 @@
+# Ledgato policy for AgentOS control-surface -> governed dispatch boundaries.
+#
+# The browser does not hold this credential. AgentOS presents a dedicated
+# `agent` principal and asks Ledgato whether an accepted directive may cross
+# from ASHWOOD, Telegram, Hermes, or autonomous backlog ignition into the
+# governed execution queue.
+#
+# This policy authorizes only that crossing. It does NOT authorize publishing,
+# deployment, credentials, purchases, browser actions, or any later tool call.
+# Those remain separate AgentOS/Ledgato boundaries and approval decisions.
+
+policies:
+  - agent: agent-os-workspace
+    allow_tool:
+      - agentos.dispatch
+    impact_max: write
+    data_domains:
+      - workspace-command::*
+      - telegram-command::*
+      - hermes-command::*
+      - autonomous-backlog::*
+    on_deny:
+      - alert
+      - human_review

@@ -1,0 +1,25 @@
+# Ledgato policy for the AgentOS protected-executor proof boundary.
+#
+# One agent, one resource family, three deliberate outcomes:
+#   release.deploy   -> ALLOW              (in scope, no approval needed)
+#   release.rollback -> APPROVAL_REQUIRED  (in scope, human approval required)
+#   release.delete   -> DENY               (explicitly denied)
+#
+# This policy authorizes nothing outside service::* and nothing above `exec`.
+# It is a proof fixture, not a production release policy.
+
+policies:
+  - agent: agent-os-deployer
+    allow_tool:
+      - release.deploy
+      - release.rollback
+    deny_tool:
+      - release.delete
+    approve_tool:
+      - release.rollback
+    impact_max: exec
+    data_domains:
+      - service::*
+    on_deny:
+      - alert
+      - human_review

@@ -14,14 +14,24 @@ local:
     - enforcement-evidence-when-implemented
   produces:
     - governance-evidence
+    - boundary-decision            # allow / deny / approval_required for a declared, enforced boundary
+    - enforcement-permit           # single-use, signed, issued only on ALLOW
     - release-attestation
     - gate-result
     - drift-or-scope-violation-evidence
   consumes:
     - governed-task-reference
+    - action-contract              # local: contracts/action-contract.schema.json
+    - authority-request            # local: contracts/authority-request.schema.json
     - capability-manifest
     - declared-agent-scope
     - applicable-policy-or-authorization-reference
+  # Implementation detail (local metadata may add, not redefine). These are the
+  # surfaces that exist in this repository today; see AGENTS.md for evidence state.
+  implemented_surfaces:
+    - consequential-action-checkpoint   # /v1/enforcement/* + ProtectedExecutor; lab-verified, not deployed
+    - policy-evaluation-at-a-governed-boundary   # /v1/authority/resolve, /v1/gateway/execute
+    - signed-hash-chained-evidence-ledger
   must_not_own:
     - generic-authorization-intelligence
     - portfolio-prioritization
