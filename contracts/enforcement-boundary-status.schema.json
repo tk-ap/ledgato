@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/enforcement-boundary-status.schema.json",
+  "title": "LEDGATo Enforcement Boundary Status",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "id",
+    "provider",
+    "resource",
+    "action",
+    "bypass_status",
+    "failure_mode",
+    "gateway_credential_owner",
+    "coverage"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.boundary-status/v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resource": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bypass_status": {
+      "enum": [
+        "UNVERIFIED",
+        "PARTIALLY_VERIFIED",
+        "VERIFIED",
+        "BYPASS_FOUND"
+      ]
+    },
+    "failure_mode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gateway_credential_owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attack_families",
+        "covered_attack_families",
+        "missing_attack_families",
+        "tested_vectors",
+        "unresolved_bypasses",
+        "provider_readback",
+        "evidence_count"
+      ],
+      "properties": {
+        "attack_families": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempts",
+              "blocked",
+              "bypasses"
+            ],
+            "properties": {
+              "attempts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "blocked": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "bypasses": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "covered_attack_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "missing_attack_families": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "tested_vectors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "unresolved_bypasses": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider_readback": {
+          "type": "boolean"
+        },
+        "evidence_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "last_verified_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_bypass_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "last_drift_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

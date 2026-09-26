@@ -175,6 +175,77 @@ class EnforcementBoundary:
         return unresolved
 
 
+    def current_verification_evidence(self) -> list[BoundaryEvidence]:
+        """Evidence applicable to the current integration configuration.
+
+        A material drift entry starts a new verification epoch. Historical
+        evidence remains preserved, but it cannot be reused to verify the
+        changed boundary.
+        """
+        latest_drift = next(
+            (
+                index
+                for index in range(len(self.verification_evidence) - 1, -1, -1)
+                if self.verification_evidence[index].kind == "drift"
+            ),
+            None,
+        )
+        if latest_drift is None:
+            return list(self.verification_evidence)
+        return list(self.verification_evidence[latest_drift + 1 :])
+
+    def verification_summary(self) -> dict[str, Any]:
+        """Return the owner/API-facing verification state for this boundary.
+
+        This is deliberately derived from append-only evidence. It does not
+        invent a second status system and it cannot promote a boundary.
+        Coverage describes the current verification epoch (after latest drift).
+        """
+        current_evidence = self.current_verification_evidence()
+        attempts = [e for e in current_evidence if e.kind in BYPASS_EVIDENCE_KINDS]
+        tested = {e.kind for e in attempts}
+        provider_readbacks = [e for e in current_evidence if e.kind == "provider_readback"]
+        status_changes = [
+            e for e in self.verification_evidence if e.kind == "status_change"
+        ]
+        verified_changes = [e for e in status_changes if e.outcome == "VERIFIED"]
+        bypasses = self.successful_bypasses()
+        drift = [e for e in self.verification_evidence if e.kind == "drift"]
+
+        families: dict[str, dict[str, int]] = {}
+        for family in sorted(REQUIRED_ATTACK_FAMILIES):
+            rows = [e for e in attempts if e.kind == family]
+            families[family] = {
+                "attempts": len(rows),
+                "blocked": sum(e.protected_action_occurred is False for e in rows),
+                "bypasses": sum(e.protected_action_occurred is True for e in rows),
+            }
+
+        return {
+            "version": "ledgato.boundary-status/v1",
+            "id": self.id,
+            "provider": self.provider,
+            "resource": self.resource,
+            "action": self.action,
+            "bypass_status": self.bypass_status,
+            "failure_mode": self.failure_mode,
+            "gateway_credential_owner": self.gateway_credential_owner,
+            "coverage": {
+                "attack_families": families,
+                "covered_attack_families": sorted(tested & REQUIRED_ATTACK_FAMILIES),
+                "missing_attack_families": sorted(REQUIRED_ATTACK_FAMILIES - tested),
+                "tested_vectors": sorted({e.vector for e in attempts if e.vector}),
+                "unresolved_bypasses": len(self.unresolved_bypasses()),
+                "provider_readback": bool(provider_readbacks),
+                "evidence_count": len(current_evidence),
+            },
+            "last_verified_at": verified_changes[-1].recorded_at if verified_changes else None,
+            "last_bypass_at": bypasses[-1].recorded_at if bypasses else None,
+            "last_drift_at": drift[-1].recorded_at if drift else None,
+            "notes": self.notes,
+        }
+
+
 class BoundaryStore:
     """File-backed registry of enforcement boundaries.
 
@@ -317,6 +388,40 @@ class BoundaryStore:
             detail=detail or {},
         )
 
+    def record_drift(
+        self,
+        boundary_id: str,
+        *,
+        summary: str,
+        detail: dict[str, Any] | None = None,
+    ) -> EnforcementBoundary:
+        """Record material deployment/integration drift and weaken stale proof.
+
+        Drift can only weaken a claim automatically. It never promotes a
+        boundary, clears BYPASS_FOUND, or grants authority.
+        """
+        boundary = self.record_evidence(
+            boundary_id,
+            kind="drift",
+            summary=summary,
+            outcome="verification_invalidated",
+            protected_action_occurred=None,
+            detail=detail or {},
+        )
+        if boundary.bypass_status == "VERIFIED":
+            boundary.bypass_status = "PARTIALLY_VERIFIED"
+            boundary.updated_at = utcnow().isoformat()
+            boundary.verification_evidence.append(
+                BoundaryEvidence(
+                    kind="status_change",
+                    summary="VERIFIED weakened to PARTIALLY_VERIFIED after material drift",
+                    outcome="PARTIALLY_VERIFIED",
+                    detail={"reason": summary},
+                )
+            )
+            self._save()
+        return boundary
+
     # -- status --------------------------------------------------------
 
     def set_status(
@@ -345,7 +450,8 @@ class BoundaryStore:
         boundary = self.get(boundary_id)
 
         if status == "VERIFIED":
-            attempts = boundary.bypass_attempts()
+            current_evidence = boundary.current_verification_evidence()
+            attempts = [e for e in current_evidence if e.kind in BYPASS_EVIDENCE_KINDS]
             if not attempts:
                 raise ValueError(
                     "cannot mark VERIFIED: no bypass/leakage/escalation attempts recorded. "
@@ -373,7 +479,7 @@ class BoundaryStore:
 
             # The boundary must actually have been exercised against the real
             # provider. Everything above can be satisfied by in-process fakes.
-            if not any(e.kind == "provider_readback" for e in boundary.verification_evidence):
+            if not any(e.kind == "provider_readback" for e in current_evidence):
                 raise ValueError(
                     "cannot mark VERIFIED: no provider_readback evidence; the boundary "
                     "has never been confirmed against the live provider"
