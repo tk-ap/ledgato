@@ -77,11 +77,18 @@ or arbitrary AgentOS code.
 
 ## Installation
 
-From a reviewed Ledgato checkout:
+Bootstrap a root-owned canonical Ledgato checkout first; do not run the
+installer from a mutable developer/agent checkout:
 
 ```bash
-sudo bash ops/install_ledgato_host_op.sh --service-user tk
+sudo install -d -o root -g root -m 0755 /var/lib/ledgato
+sudo git clone --branch main --single-branch https://github.com/tk-ap/ledgato.git /var/lib/ledgato/source
+sudo bash /var/lib/ledgato/source/ops/install_ledgato_host_op.sh --service-user tk
 ```
+
+If the root-owned source already exists, the installer itself verifies exact
+origin, clean `main`, fast-forward-only history, and convergence to fetched
+`origin/main` before it installs any helper code.
 
 The installer:
 
