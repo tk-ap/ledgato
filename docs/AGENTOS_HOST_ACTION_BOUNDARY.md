@@ -58,8 +58,22 @@ owner = root
 clean = true
 ```
 
-Before installing units it fetches canonical `origin/main`, permits only a
-fast-forward, and requires local HEAD to equal fetched `origin/main`.
+Because `tk-ap/agent-os` is private, the root helper never performs a GitHub
+fetch and never receives an owner GitHub credential.
+
+Instead, the owner stages the current authenticated `origin/main` into the
+root-owned immutable bundle:
+
+```text
+/var/lib/ledgato/agent-os-main.bundle
+```
+
+The helper validates that bundle, fast-forwards only the root-owned mirror from
+its `refs/heads/main`, preserves
+`https://github.com/tk-ap/agent-os.git` as canonical upstream metadata, and
+requires mirror HEAD plus its local `origin/main` reference to equal the staged
+bundle SHA. A stale bundle can leave the mirror unchanged; a bundle that would
+move the mirror backward or sideways fails closed.
 
 Only these files can be installed:
 
@@ -69,6 +83,8 @@ Only these files can be installed:
 - `agentos-board-projection.timer`
 - `agentos-workspace-board-publisher.service`
 - `agentos-board-projection.service.d/20-workspace-board-publisher.conf`
+- `/usr/local/libexec/agentos-runtime-sync` from
+  `runtime/agentos_runtime_sync.sh`
 
 The retired workspace publisher timer is disabled if it still exists.
 
@@ -105,6 +121,30 @@ The configured service account is part of this bounded host TCB. AgentOS worker
 processes must continue to run as the separate `agentos` account and must not
 receive this sudo permission.
 
+## Stage private AgentOS source
+
+Before activation, stage the current canonical AgentOS main using the owner
+account's existing GitHub authentication:
+
+```bash
+bash /var/lib/ledgato/source/ops/stage_agentos_source.sh
+```
+
+The staging script:
+
+1. runs as the owner account, not root;
+2. verifies the source checkout points at
+   `https://github.com/tk-ap/agent-os.git`;
+3. fetches only `origin/main` using the owner's existing Git credential path;
+4. builds a temporary bundle exposing only `refs/heads/main`;
+5. installs only that bundle root-owned at
+   `/var/lib/ledgato/agent-os-main.bundle`;
+6. prints the staged commit SHA but never prints or copies a GitHub credential.
+
+Root and the `agentos` runtime account therefore need no GitHub credential.
+The bundle must be refreshed before a later activation is expected to adopt a
+new AgentOS revision.
+
 ## Enable the adapter
 
 The owner-managed Ledgato environment must add these non-secret values:
@@ -130,12 +170,14 @@ Restart the existing Ledgato service after adding the variables, then verify
 
 The activation helper performs only the following bounded sequence:
 
-1. validate/update the root-owned canonical AgentOS mirror;
+1. validate the root-owned staged AgentOS bundle and fast-forward the
+   root-owned canonical AgentOS mirror from it;
 2. validate fixed unit files with `systemd-analyze verify`;
-3. install those files root-owned under `/etc/systemd/system`;
+3. install those files root-owned under `/etc/systemd/system` and install the
+   fixed credential-free runtime sync helper under `/usr/local/libexec`;
 4. reload the system systemd manager;
 5. run `agentos-runtime-checkout.service` once to provision the account-owned
-   clean runtime;
+   clean runtime from the root-owned local mirror;
 6. enable/start `agentos-runtime-checkout.timer` and
    `agentos-board-projection.timer`;
 7. run one board projection, whose existing `OnSuccess` hook publishes the
