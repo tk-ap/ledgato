@@ -122,3 +122,30 @@ def test_installer_refuses_mutable_noncanonical_source_by_contract():
     assert "status --porcelain" in installer
     assert "merge-base --is-ancestor HEAD origin/main" in installer
     assert "merge --ff-only origin/main" in installer
+
+def test_private_agentos_source_staging_never_exports_github_credentials():
+    stage = (
+        Path(__file__).resolve().parents[2] / "ops" / "stage_agentos_source.sh"
+    ).read_text()
+
+    assert 'git -C "${SOURCE_WORKTREE}" fetch --prune origin main' in stage
+    assert "/var/lib/ledgato/agent-os-main.bundle" in stage
+    assert "sudo install -o root -g root -m 0644" in stage
+    assert "GITHUB_TOKEN" not in stage
+    assert "GH_TOKEN" not in stage
+    assert "AGENT_OS_LEDGATO_AGENT_TOKEN" not in stage
+
+
+def test_root_helper_consumes_staged_bundle_not_github_network():
+    helper = (
+        Path(__file__).resolve().parents[2] / "ops" / "ledgato_host_op.py"
+    ).read_text()
+
+    assert 'SOURCE_BUNDLE = Path("/var/lib/ledgato/agent-os-main.bundle")' in helper
+    assert '"bundle", "list-heads"' in helper
+    assert 'str(SOURCE_BUNDLE)' in helper
+    assert '"refs/heads/main:refs/remotes/staged/main"' in helper
+    assert '"/usr/local/libexec/agentos-runtime-sync"' in helper
+    assert '"fetch", "origin", "main"' not in helper
+    assert 'GITHUB_TOKEN' not in helper
+    assert 'GH_TOKEN' not in helper

@@ -16,6 +16,7 @@ from typing import Any
 
 SOURCE_ROOT = Path("/var/lib/ledgato/agent-os-source")
 SOURCE_PARENT = SOURCE_ROOT.parent
+SOURCE_BUNDLE = Path("/var/lib/ledgato/agent-os-main.bundle")
 RUNTIME_ROOT = Path("/home/agentos/.local/share/agent-os/runtime")
 REMOTE = "https://github.com/tk-ap/agent-os.git"
 
@@ -43,6 +44,13 @@ UNIT_FILES = (
     (
         "runtime/systemd/agentos-board-projection.service.d/20-workspace-board-publisher.conf",
         "/etc/systemd/system/agentos-board-projection.service.d/20-workspace-board-publisher.conf",
+    ),
+)
+
+RUNTIME_EXECUTABLES = (
+    (
+        "runtime/agentos_runtime_sync.sh",
+        "/usr/local/libexec/agentos-runtime-sync",
     ),
 )
 
@@ -115,9 +123,30 @@ def _assert_root_owned_path(path: Path) -> None:
         raise HostOperationError(f"source path is group/world writable: {path}")
 
 
+def _bundle_main_sha() -> str:
+    if SOURCE_BUNDLE.is_symlink() or not SOURCE_BUNDLE.is_file():
+        raise HostOperationError(
+            f"staged AgentOS bundle is missing or not a regular file: {SOURCE_BUNDLE}"
+        )
+    _assert_root_owned_path(SOURCE_BUNDLE)
+    listed = _run(
+        ["/usr/bin/git", "bundle", "list-heads", str(SOURCE_BUNDLE), "refs/heads/main"]
+    ).stdout.strip().splitlines()
+    if len(listed) != 1:
+        raise HostOperationError("staged AgentOS bundle must expose exactly refs/heads/main")
+    parts = listed[0].split()
+    if len(parts) != 2 or parts[1] != "refs/heads/main":
+        raise HostOperationError("staged AgentOS bundle has an unexpected main ref")
+    sha = parts[0].strip()
+    if len(sha) != 40 or any(ch not in "0123456789abcdef" for ch in sha.lower()):
+        raise HostOperationError("staged AgentOS bundle main is not a full commit SHA")
+    return sha
+
+
 def _ensure_source() -> str:
     SOURCE_PARENT.mkdir(parents=True, exist_ok=True, mode=0o755)
     _assert_root_owned_path(SOURCE_PARENT)
+    bundle_sha = _bundle_main_sha()
 
     if not (SOURCE_ROOT / ".git").exists():
         if SOURCE_ROOT.exists():
@@ -128,13 +157,15 @@ def _ensure_source() -> str:
             [
                 "/usr/bin/git",
                 "clone",
+                "--no-hardlinks",
                 "--branch",
                 "main",
                 "--single-branch",
-                REMOTE,
+                str(SOURCE_BUNDLE),
                 str(SOURCE_ROOT),
             ]
         )
+        _git("remote", "set-url", "origin", REMOTE)
 
     _assert_root_owned_path(SOURCE_ROOT)
     _assert_root_owned_path(SOURCE_ROOT / ".git")
@@ -146,18 +177,35 @@ def _ensure_source() -> str:
     if _git_text("status", "--porcelain"):
         raise HostOperationError("root-owned AgentOS mirror is dirty")
 
-    _git("fetch", "--prune", "origin", "main")
-    ancestor = _git("merge-base", "--is-ancestor", "HEAD", "origin/main", check=False)
+    # Refresh only from the owner-staged immutable bundle. Root never receives a
+    # GitHub credential and never performs a network fetch.
+    _git("update-ref", "-d", "refs/remotes/staged/main", check=False)
+    _git(
+        "fetch",
+        str(SOURCE_BUNDLE),
+        "refs/heads/main:refs/remotes/staged/main",
+    )
+    staged_sha = _git_text("rev-parse", "refs/remotes/staged/main")
+    if staged_sha != bundle_sha:
+        raise HostOperationError("staged bundle SHA changed during refresh")
+
+    ancestor = _git(
+        "merge-base", "--is-ancestor", "HEAD", "refs/remotes/staged/main", check=False
+    )
     if ancestor.returncode != 0:
         raise HostOperationError(
-            "root-owned AgentOS mirror is not a fast-forward ancestor of origin/main"
+            "root-owned AgentOS mirror is not a fast-forward ancestor of staged main"
         )
-    _git("merge", "--ff-only", "origin/main")
+    _git("merge", "--ff-only", "refs/remotes/staged/main")
+    _git("update-ref", "refs/remotes/origin/main", "refs/remotes/staged/main")
+    _git("update-ref", "-d", "refs/remotes/staged/main")
 
     head = _git_text("rev-parse", "HEAD")
-    upstream = _git_text("rev-parse", "origin/main")
-    if head != upstream:
-        raise HostOperationError("root-owned AgentOS mirror did not converge to origin/main")
+    upstream = _git_text("rev-parse", "refs/remotes/origin/main")
+    if head != bundle_sha or upstream != bundle_sha:
+        raise HostOperationError(
+            "root-owned AgentOS mirror did not converge to staged canonical main"
+        )
     if _git_text("status", "--porcelain"):
         raise HostOperationError("root-owned AgentOS mirror became dirty after update")
     return head
@@ -193,6 +241,24 @@ def _install_units() -> None:
                 "root",
                 "-m",
                 "0644",
+                str(source),
+                str(destination),
+            ]
+        )
+
+    for relative, destination_text in RUNTIME_EXECUTABLES:
+        source = _validated_source(relative)
+        destination = Path(destination_text)
+        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+        _run(
+            [
+                "/usr/bin/install",
+                "-o",
+                "root",
+                "-g",
+                "root",
+                "-m",
+                "0755",
                 str(source),
                 str(destination),
             ]
