@@ -109,3 +109,16 @@ def test_sudoers_template_contains_exact_commands_without_wildcards():
     assert "${TARGET} agentos-runtime-activate" in installer
     assert "${TARGET} *" not in installer
     assert "NOPASSWD: ALL" not in installer
+
+
+def test_installer_refuses_mutable_noncanonical_source_by_contract():
+    installer = (
+        Path(__file__).resolve().parents[2] / "ops" / "install_ledgato_host_op.sh"
+    ).read_text()
+
+    assert "stat -c '%u'" in installer
+    assert "https://github.com/tk-ap/ledgato.git" in installer
+    assert "branch --show-current" in installer
+    assert "status --porcelain" in installer
+    assert "merge-base --is-ancestor HEAD origin/main" in installer
+    assert "merge --ff-only origin/main" in installer
