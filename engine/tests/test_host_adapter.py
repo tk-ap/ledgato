@@ -184,3 +184,41 @@ def test_malformed_helper_output_fails_closed():
                 domain="ashwood-host-01",
             )
         )
+
+
+def test_host_adapter_env_is_explicit_opt_in(monkeypatch):
+    import ledgato.api as api
+
+    for key in (
+        "LEDGATO_HOST_OP_ENABLED",
+        "LEDGATO_HOST_OP_RESOURCE",
+        "LEDGATO_HOST_OP_HELPER",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    assert "host" not in api._default_adapters_from_env()
+
+    monkeypatch.setenv("LEDGATO_HOST_OP_ENABLED", "1")
+    with pytest.raises(RuntimeError, match="LEDGATO_HOST_OP_RESOURCE"):
+        api._default_adapters_from_env()
+
+
+def test_host_adapter_env_binds_fixed_resource(monkeypatch):
+    import ledgato.api as api
+
+    captured = {}
+
+    class StubHost:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr(api, "HostActionAdapter", StubHost)
+    monkeypatch.setenv("LEDGATO_HOST_OP_ENABLED", "true")
+    monkeypatch.setenv("LEDGATO_HOST_OP_RESOURCE", "ashwood-host-01")
+    monkeypatch.setenv("LEDGATO_HOST_OP_HELPER", "/usr/local/libexec/ledgato-host-op")
+
+    adapters = api._default_adapters_from_env()
+    assert "host" in adapters
+    assert captured["resource"] == "ashwood-host-01"
+    assert captured["helper_path"] == "/usr/local/libexec/ledgato-host-op"
+    assert captured["validate_helper"] is True
