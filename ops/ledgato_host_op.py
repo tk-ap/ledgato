@@ -225,6 +225,28 @@ def _validated_source(relative: str) -> Path:
 
 
 def _install_units() -> None:
+    # systemd-analyze verify resolves absolute ExecStart paths. Install the
+    # fixed root-owned runtime executable first so verification validates the
+    # real final command path instead of failing merely because this is the
+    # first activation on the host.
+    for relative, destination_text in RUNTIME_EXECUTABLES:
+        source = _validated_source(relative)
+        destination = Path(destination_text)
+        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
+        _run(
+            [
+                "/usr/bin/install",
+                "-o",
+                "root",
+                "-g",
+                "root",
+                "-m",
+                "0755",
+                str(source),
+                str(destination),
+            ]
+        )
+
     verify_paths = [str(_validated_source(relative)) for relative in VERIFY_UNITS]
     _run(["/usr/bin/systemd-analyze", "verify", *verify_paths])
 
@@ -241,24 +263,6 @@ def _install_units() -> None:
                 "root",
                 "-m",
                 "0644",
-                str(source),
-                str(destination),
-            ]
-        )
-
-    for relative, destination_text in RUNTIME_EXECUTABLES:
-        source = _validated_source(relative)
-        destination = Path(destination_text)
-        destination.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
-        _run(
-            [
-                "/usr/bin/install",
-                "-o",
-                "root",
-                "-g",
-                "root",
-                "-m",
-                "0755",
                 str(source),
                 str(destination),
             ]

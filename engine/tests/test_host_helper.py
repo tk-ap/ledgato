@@ -100,6 +100,57 @@ def test_activation_installs_only_fixed_units_and_fixed_systemd_actions(monkeypa
     assert "tailscale" not in joined
 
 
+def test_runtime_sync_is_installed_before_systemd_verify(monkeypatch, tmp_path):
+    helper = load_helper()
+    calls = []
+
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    (source_root / "runtime").mkdir()
+    sync = source_root / "runtime" / "agentos_runtime_sync.sh"
+    sync.write_text("#!/usr/bin/env bash\nexit 0\n")
+
+    unit_dir = source_root / "runtime" / "systemd"
+    unit_dir.mkdir()
+    unit = unit_dir / "agentos-runtime-checkout.service"
+    unit.write_text("[Service]\nExecStart=/usr/local/libexec/agentos-runtime-sync\n")
+
+    monkeypatch.setattr(helper, "SOURCE_ROOT", source_root)
+    runtime_sync_target = tmp_path / "installed" / "agentos-runtime-sync"
+    monkeypatch.setattr(
+        helper,
+        "RUNTIME_EXECUTABLES",
+        (("runtime/agentos_runtime_sync.sh", str(runtime_sync_target)),),
+    )
+    monkeypatch.setattr(
+        helper,
+        "VERIFY_UNITS",
+        ("runtime/systemd/agentos-runtime-checkout.service",),
+    )
+    monkeypatch.setattr(helper, "UNIT_FILES", ())
+    monkeypatch.setattr(helper, "_assert_root_owned_path", lambda path: None)
+    monkeypatch.setattr(
+        helper,
+        "_run",
+        lambda argv, **kwargs: calls.append(tuple(argv)) or type(
+            "Result", (), {"returncode": 0, "stdout": "", "stderr": ""}
+        )(),
+    )
+
+    helper._install_units()
+
+    install_i = next(
+        i for i, call in enumerate(calls)
+        if call[:2] == ("/usr/bin/install", "-o")
+        and str(runtime_sync_target) in call
+    )
+    verify_i = next(
+        i for i, call in enumerate(calls)
+        if call[:2] == ("/usr/bin/systemd-analyze", "verify")
+    )
+    assert install_i < verify_i
+
+
 def test_sudoers_template_contains_exact_commands_without_wildcards():
     installer = (
         Path(__file__).resolve().parents[2] / "ops" / "install_ledgato_host_op.sh"
