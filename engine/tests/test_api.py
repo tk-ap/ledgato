@@ -242,13 +242,19 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
     doc = yaml.safe_load(source.read_text())
     policy = doc["policies"][0]
     assert policy["agent"] == "agent-os-workspace"
-    assert policy["allow_tool"] == ["agentos.dispatch"]
+    assert policy["allow_tool"] == [
+        "agentos.dispatch",
+        "host.agentos.runtime.status",
+        "host.agentos.runtime.activate",
+    ]
+    assert policy["approve_tool"] == ["host.agentos.runtime.activate"]
     assert policy["impact_max"] == "write"
     assert policy["data_domains"] == [
         "workspace-command::*",
         "telegram-command::*",
         "hermes-command::*",
         "autonomous-backlog::*",
+        "ashwood-host-01",
     ]
 
     cfg = tmp_path / "fence.yaml"
@@ -281,6 +287,30 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         })
         assert allowed.status_code == 200
         assert allowed.json()["outcome"] == "ALLOW"
+
+    host_status = local.post("/v1/actions/check", json={
+        "agent": "agent-os-workspace",
+        "action": {
+            "tool": "host.agentos.runtime.status",
+            "impact": "readonly",
+            "domain": "ashwood-host-01",
+        },
+    })
+    assert host_status.status_code == 200
+    assert host_status.json()["outcome"] == "ALLOW"
+
+    host_activate = local.post("/v1/actions/check", json={
+        "agent": "agent-os-workspace",
+        "task_id": "agentos-runtime-autonomy-reboot-proof",
+        "action": {
+            "tool": "host.agentos.runtime.activate",
+            "impact": "write",
+            "domain": "ashwood-host-01",
+        },
+    })
+    assert host_activate.status_code == 200
+    assert host_activate.json()["outcome"] == "APPROVE"
+    assert host_activate.json()["allow"] is False
 
     escaped_domain = local.post("/v1/actions/check", json={
         "agent": "agent-os-workspace",
