@@ -54,9 +54,40 @@ if [[ "$(id -u "${SERVICE_USER}")" -eq 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(git -C "${SCRIPT_DIR}/.." rev-parse --show-toplevel)"
 SOURCE="${SCRIPT_DIR}/ledgato_host_op.py"
 TARGET="/usr/local/libexec/ledgato-host-op"
 SUDOERS="/etc/sudoers.d/ledgato-host-op"
+CANONICAL_REMOTE="https://github.com/tk-ap/ledgato.git"
+
+# A root install must not execute helper code out of a mutable user/agent
+# checkout. The bootstrap checkout is itself part of the privileged TCB.
+if [[ "$(stat -c '%u' "${REPO_ROOT}")" -ne 0 ]]; then
+  echo "Ledgato install source must be root-owned: ${REPO_ROOT}" >&2
+  exit 1
+fi
+if [[ "$(git -C "${REPO_ROOT}" remote get-url origin)" != "${CANONICAL_REMOTE}" ]]; then
+  echo "Ledgato install source has unexpected origin" >&2
+  exit 1
+fi
+if [[ "$(git -C "${REPO_ROOT}" branch --show-current)" != "main" ]]; then
+  echo "Ledgato install source must be on main" >&2
+  exit 1
+fi
+if [[ -n "$(git -C "${REPO_ROOT}" status --porcelain)" ]]; then
+  echo "Ledgato install source must be clean" >&2
+  exit 1
+fi
+git -C "${REPO_ROOT}" fetch --prune origin main
+if ! git -C "${REPO_ROOT}" merge-base --is-ancestor HEAD origin/main; then
+  echo "Ledgato install source is not a fast-forward ancestor of origin/main" >&2
+  exit 1
+fi
+git -C "${REPO_ROOT}" merge --ff-only origin/main >/dev/null
+if [[ "$(git -C "${REPO_ROOT}" rev-parse HEAD)" != "$(git -C "${REPO_ROOT}" rev-parse origin/main)" ]]; then
+  echo "Ledgato install source did not converge to canonical main" >&2
+  exit 1
+fi
 
 if [[ ! -f "${SOURCE}" || -L "${SOURCE}" ]]; then
   echo "missing regular helper source: ${SOURCE}" >&2
