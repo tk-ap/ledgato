@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from . import attestation as attest_ops
 from .adapters.base import EnforcementAdapter
 from .adapters.github import GitHubAdapter
+from .adapters.host import HostActionAdapter
 from .adapters.x402 import X402Adapter
 from .approvals import ApprovalStore
 from .decision_prompt import from_approval as decision_prompt_from_approval
@@ -844,6 +845,25 @@ def _default_adapters_from_env() -> dict[str, EnforcementAdapter]:
             repository=repository,
             token=token,
             api_url=os.getenv("LEDGATO_GITHUB_API_URL"),
+        )
+
+    host_enabled = (os.getenv("LEDGATO_HOST_OP_ENABLED") or "").strip().lower()
+    if host_enabled in {"1", "true", "yes", "on"}:
+        resource = (os.getenv("LEDGATO_HOST_OP_RESOURCE") or "").strip()
+        if not resource:
+            raise RuntimeError(
+                "LEDGATO_HOST_OP_RESOURCE is required when host actions are enabled"
+            )
+        adapters["host"] = HostActionAdapter(
+            resource=resource,
+            helper_path=os.getenv(
+                "LEDGATO_HOST_OP_HELPER", "/usr/local/libexec/ledgato-host-op"
+            ),
+            sudo_path=os.getenv("LEDGATO_HOST_OP_SUDO", "/usr/bin/sudo"),
+            timeout_seconds=float(
+                os.getenv("LEDGATO_HOST_OP_TIMEOUT_SECONDS", "120")
+            ),
+            validate_helper=True,
         )
 
     x402_private_key = os.getenv("LEDGATO_X402_EVM_PRIVATE_KEY")
