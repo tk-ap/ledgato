@@ -272,8 +272,19 @@ def _install_units() -> None:
 def _runtime_git_text(*args: str) -> str | None:
     if not (RUNTIME_ROOT / ".git").exists():
         return None
+    # The privileged helper reads an account-owned checkout. Git correctly
+    # rejects cross-owner repositories by default, so allow exactly this fixed
+    # runtime path for this one read-only invocation instead of changing any
+    # global safe.directory configuration.
     completed = _run(
-        ["/usr/bin/git", "-C", str(RUNTIME_ROOT), *args],
+        [
+            "/usr/bin/git",
+            "-c",
+            f"safe.directory={RUNTIME_ROOT}",
+            "-C",
+            str(RUNTIME_ROOT),
+            *args,
+        ],
         check=False,
     )
     if completed.returncode != 0:
