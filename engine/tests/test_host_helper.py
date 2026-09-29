@@ -116,10 +116,11 @@ def test_runtime_sync_is_installed_before_systemd_verify(monkeypatch, tmp_path):
     unit.write_text("[Service]\nExecStart=/usr/local/libexec/agentos-runtime-sync\n")
 
     monkeypatch.setattr(helper, "SOURCE_ROOT", source_root)
+    runtime_sync_target = tmp_path / "installed" / "agentos-runtime-sync"
     monkeypatch.setattr(
         helper,
         "RUNTIME_EXECUTABLES",
-        (("runtime/agentos_runtime_sync.sh", "/usr/local/libexec/agentos-runtime-sync"),),
+        (("runtime/agentos_runtime_sync.sh", str(runtime_sync_target)),),
     )
     monkeypatch.setattr(
         helper,
@@ -141,7 +142,7 @@ def test_runtime_sync_is_installed_before_systemd_verify(monkeypatch, tmp_path):
     install_i = next(
         i for i, call in enumerate(calls)
         if call[:2] == ("/usr/bin/install", "-o")
-        and "/usr/local/libexec/agentos-runtime-sync" in call
+        and str(runtime_sync_target) in call
     )
     verify_i = next(
         i for i, call in enumerate(calls)
