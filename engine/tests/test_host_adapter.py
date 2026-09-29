@@ -1,0 +1,186 @@
+import json
+import subprocess
+
+import pytest
+
+from ledgato.adapters.host import (
+    HostActionAdapter,
+    RUNTIME_ACTIVATE_TOOL,
+    RUNTIME_STATUS_TOOL,
+)
+from ledgato.models import Action
+
+
+class Runner:
+    def __init__(self):
+        self.calls = []
+        self.results = {
+            "agentos-runtime-status": {
+                "operation": "agentos-runtime-status",
+                "status": "ok",
+                "healthy": True,
+                "runtime_sha": "abc123",
+            },
+            "agentos-runtime-activate": {
+                "operation": "agentos-runtime-activate",
+                "status": "ok",
+                "healthy": True,
+                "activated": True,
+                "runtime_sha": "abc123",
+            },
+        }
+
+    def __call__(self, argv, **kwargs):
+        self.calls.append((list(argv), dict(kwargs)))
+        operation = argv[-1]
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout=json.dumps(self.results[operation]),
+            stderr="",
+        )
+
+
+def adapter(runner):
+    return HostActionAdapter(
+        resource="ashwood-host-01",
+        helper_path="/usr/local/libexec/ledgato-host-op",
+        sudo_path="/usr/bin/sudo",
+        validate_helper=False,
+        runner=runner,
+    )
+
+
+def test_status_uses_one_fixed_noninteractive_helper_command():
+    runner = Runner()
+    result = adapter(runner).execute(
+        Action(
+            tool=RUNTIME_STATUS_TOOL,
+            impact="readonly",
+            domain="ashwood-host-01",
+        )
+    )
+
+    assert result.executed is True
+    assert result.result["healthy"] is True
+    assert runner.calls[0][0] == [
+        "/usr/bin/sudo",
+        "-n",
+        "/usr/local/libexec/ledgato-host-op",
+        "agentos-runtime-status",
+    ]
+
+
+def test_activation_never_forwards_caller_arguments():
+    runner = Runner()
+    target = adapter(runner)
+
+    with pytest.raises(ValueError, match="do not accept caller parameters"):
+        target.execute(
+            Action(
+                tool=RUNTIME_ACTIVATE_TOOL,
+                impact="write",
+                domain="ashwood-host-01",
+                params={"unit": "ssh.service", "command": "anything"},
+            )
+        )
+
+    assert runner.calls == []
+
+
+def test_unlisted_host_action_is_rejected_before_sudo():
+    runner = Runner()
+
+    with pytest.raises(ValueError, match="not allowlisted"):
+        adapter(runner).execute(
+            Action(
+                tool="host.shell.exec",
+                impact="write",
+                domain="ashwood-host-01",
+            )
+        )
+
+    assert runner.calls == []
+
+
+def test_wrong_host_or_impact_is_rejected_before_sudo():
+    runner = Runner()
+    target = adapter(runner)
+
+    with pytest.raises(ValueError, match="domain must exactly match"):
+        target.execute(
+            Action(
+                tool=RUNTIME_ACTIVATE_TOOL,
+                impact="write",
+                domain="different-host",
+            )
+        )
+    with pytest.raises(ValueError, match="requires impact 'write'"):
+        target.execute(
+            Action(
+                tool=RUNTIME_ACTIVATE_TOOL,
+                impact="readonly",
+                domain="ashwood-host-01",
+            )
+        )
+
+    assert runner.calls == []
+
+
+def test_denied_verification_never_touches_helper():
+    runner = Runner()
+    result = adapter(runner).verify_denied(
+        Action(
+            tool=RUNTIME_ACTIVATE_TOOL,
+            impact="write",
+            domain="ashwood-host-01",
+        )
+    )
+
+    assert result["helper_invoked"] is False
+    assert runner.calls == []
+
+
+def test_post_action_verification_uses_only_fixed_status_operation():
+    runner = Runner()
+    target = adapter(runner)
+    receipt = target.execute(
+        Action(
+            tool=RUNTIME_ACTIVATE_TOOL,
+            impact="write",
+            domain="ashwood-host-01",
+        )
+    )
+    verified = target.verify(
+        Action(
+            tool=RUNTIME_ACTIVATE_TOOL,
+            impact="write",
+            domain="ashwood-host-01",
+        ),
+        receipt,
+    )
+
+    assert verified["verified"] is True
+    assert [call[0][-1] for call in runner.calls] == [
+        "agentos-runtime-activate",
+        "agentos-runtime-status",
+    ]
+
+
+def test_malformed_helper_output_fails_closed():
+    def runner(argv, **kwargs):
+        return subprocess.CompletedProcess(argv, 0, stdout="not-json", stderr="")
+
+    target = HostActionAdapter(
+        resource="ashwood-host-01",
+        validate_helper=False,
+        runner=runner,
+    )
+    with pytest.raises(RuntimeError, match="malformed JSON"):
+        target.execute(
+            Action(
+                tool=RUNTIME_STATUS_TOOL,
+                impact="readonly",
+                domain="ashwood-host-01",
+            )
+        )
