@@ -151,6 +151,31 @@ def test_runtime_sync_is_installed_before_systemd_verify(monkeypatch, tmp_path):
     assert install_i < verify_i
 
 
+def test_runtime_status_uses_only_fixed_safe_directory(monkeypatch, tmp_path):
+    helper = load_helper()
+    runtime_root = tmp_path / "runtime"
+    (runtime_root / ".git").mkdir(parents=True)
+
+    calls = []
+    monkeypatch.setattr(helper, "RUNTIME_ROOT", runtime_root)
+    monkeypatch.setattr(
+        helper,
+        "_run",
+        lambda argv, **kwargs: calls.append(tuple(argv)) or type(
+            "Result", (), {"returncode": 0, "stdout": "abc\n", "stderr": ""}
+        )(),
+    )
+
+    assert helper._runtime_git_text("rev-parse", "HEAD") == "abc"
+    assert calls
+    cmd = calls[0]
+    assert cmd[0] == "/usr/bin/git"
+    assert cmd[1] == "-c"
+    assert cmd[2] == f"safe.directory={runtime_root}"
+    assert cmd[3:5] == ("-C", str(runtime_root))
+    assert "--global" not in cmd
+
+
 def test_sudoers_template_contains_exact_commands_without_wildcards():
     installer = (
         Path(__file__).resolve().parents[2] / "ops" / "install_ledgato_host_op.sh"
