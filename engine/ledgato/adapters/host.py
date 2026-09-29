@@ -67,6 +67,8 @@ class HostActionAdapter:
 
     @staticmethod
     def _validate_helper_installation(helper: Path) -> None:
+        if helper.is_symlink():
+            raise RuntimeError(f"Ledgato host helper must not be a symlink: {helper}")
         try:
             info = helper.stat()
         except FileNotFoundError as exc:
