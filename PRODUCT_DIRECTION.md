@@ -62,7 +62,7 @@ The aim is not to add approval ceremony everywhere. The aim is to make consequen
 
 The long-term assurance loop is:
 
-**Declare → Test → Decide → Enforce → Attest → Verify → Learn**
+**Declare → Test → Decide → Enforce → Attest → Verify → Contain/Recover → Learn**
 
 ### 1. Declare
 
@@ -147,7 +147,26 @@ Key question:
 
 This is verification, not generic surveillance.
 
-### 7. Learn
+### 7. Contain / Recover
+
+Assume prevention can fail. When provider-side verification shows that a protected boundary was crossed outside intended authority, the assurance path should be able to reduce further damage and return the system to a known-safe state.
+
+The protected resource or provider is the final witness of impact. A Ledgato decision, gateway log, or agent self-report is not sufficient proof that a protected action did or did not occur.
+
+Where integrations permit, containment/recovery should be able to:
+
+- mark the affected boundary or vector as breached / `BYPASS_FOUND`;
+- revoke or invalidate related grants, permits, resume capability, and other reusable authority;
+- prevent the same task or compromised execution path from continuing consequential work without a fresh decision;
+- isolate or quarantine the affected principal, credential, adapter, or route when policy requires;
+- preserve tamper-resistant evidence before remediation changes state;
+- identify a known-safe provider/resource state;
+- perform or request rollback/recovery under separately authorized authority;
+- require independent provider-side verification before normal execution resumes.
+
+This is not a promise that Ledgato can restore every external system itself. Recovery may be performed by AgentOS, the protected provider, an operator, or another authorized recovery mechanism. Ledgato's responsibility is to make the boundary incident explicit, narrow further authority, preserve evidence, and participate in a governed return to safety.
+
+### 8. Learn
 
 Use accumulated assurance records to improve future policies, approvals, boundaries, agent selection, and execution design.
 
@@ -568,6 +587,7 @@ khrystal is therefore **independent assurance, not an independent workflow**.
 - release gating and Agent Release Assurance;
 - signed/tamper-evident attestations where useful;
 - verification that actual outcomes remained inside approved authority;
+- containment and governed recovery when provider-side truth shows a boundary was crossed;
 - integrations that embed assurance into existing work surfaces.
 
 ### Future, but aligned
@@ -590,7 +610,7 @@ khrystal is therefore **independent assurance, not an independent workflow**.
 - requiring a manual approval step for every low-risk action;
 - promising to prevent every exploit, escape, zero-day, or malicious behavior.
 
-A defensible khrystal promise is to **reduce reachable authority, gate consequential crossings, limit blast radius where integration allows, and create evidence when policy is tested or violated** — not to make autonomous systems infallible.
+A defensible khrystal promise is to **reduce reachable authority, gate consequential crossings, detect provider-side boundary violations, limit blast radius where integration allows, preserve trustworthy evidence, and support governed recovery** — not to make autonomous systems infallible.
 
 ## PEART record model
 
