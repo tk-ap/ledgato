@@ -1,0 +1,37 @@
+version: 1
+product_key: ledgato
+
+source:
+  repository: tk-ap/ledgato
+  production_branch: main
+
+production:
+  provider: vercel
+  # Vercel project name not verified from this repository; do not infer it from the URL.
+  project: null
+  url: https://ledgato.vercel.app/
+
+sandboxes:
+  primary:
+    provider: here-now
+    inherit_connection: owner:provider:here-now
+    lifecycle: live
+    static_primary: true
+    slug: karma-plover-ntkb
+    url: https://karma-plover-ntkb.here.now/
+    current_version_id: 01M37P6JRW4708PCFPGP0GZ25A
+    source_ref: 847e120962aed265ddae51f4767aed8f8f7291c0
+    verification:
+      state: pending
+      evidence_refs: []
+    notes:
+      - "Static UI build only. Sign-in, database, payments and API routes are unavailable in this sandbox and are not simulated."
+      - "Build with scripts/sandbox-build.sh, then publish the output directory to the same slug; never create a replacement site."
+      - "Verification is pending: HTTP 200 checks on the root and a few routes only. No browser or mobile verification has been recorded."
+
+rules:
+  - sandbox-state-never-implies-production-state
+  - sandbox-credentials-are-owner-level-or-external-secret-references-never-inline
+  - stable-sandbox-slug-is-preferred-over-disposable-preview-urls
+  - record-source-ref-and-verification-evidence-for-each-sandbox-version
+  - browser-test-accounts-remain-product-specific-and-separate-from-provider-ownership
