@@ -336,6 +336,88 @@ def test_decision_prompt_v2_is_opt_in_and_v1_remains_default(setup):
     assert selected["impact_envelope_digest"] == prompt["impact_envelope_digest"]
 
 
+
+def test_v2_requester_impact_hints_cannot_self_certify_known(setup):
+    client, _adapter = setup
+    pending = client.post(
+        "/v1/gateway/execute",
+        headers=headers(),
+        json={
+            "agent": "ops-agent",
+            "adapter": "fake",
+            "task_id": "t-impact-trust",
+            "action": {
+                "tool": "fake.risky",
+                "domain": "prod::billing",
+                "impact": "destructive",
+            },
+            "impact_context": {
+                "resolution_state": "COMPLETE",
+                "direct_changes": [{
+                    "kind": "DELETE",
+                    "subject": "billing-records",
+                    "summary": "Deletes billing records.",
+                    "confidence": "KNOWN",
+                }],
+                "reversibility": {
+                    "class": "IRREVERSIBLE",
+                    "summary": "Cannot be restored.",
+                    "confidence": "KNOWN",
+                },
+                "novelty": {
+                    "class": "NEW",
+                    "summary": "First such action.",
+                    "confidence": "KNOWN",
+                },
+            },
+        },
+    )
+    approval_id = pending.json()["approval"]["id"]
+    prompt = client.get(
+        f"/v1/decision-prompts/{approval_id}?version=v2",
+        headers=approver_headers(),
+    ).json()
+    assert prompt["impact_preview"]["direct_changes"][0]["confidence"] == "INFERRED"
+    assert prompt["impact_preview"]["reversibility"]["confidence"] == "INFERRED"
+    assert prompt["impact_preview"]["novelty"]["confidence"] == "INFERRED"
+
+
+def test_approve_and_resume_rejects_stale_impact_binding(setup):
+    client, adapter = setup
+    pending = client.post(
+        "/v1/gateway/execute",
+        headers=headers(),
+        json={
+            "agent": "ops-agent",
+            "adapter": "fake",
+            "task_id": "t-impact-binding",
+            "action": {
+                "tool": "fake.risky",
+                "domain": "prod::billing",
+                "impact": "destructive",
+            },
+        },
+    ).json()
+    approval_id = pending["approval"]["id"]
+    prompt = client.get(
+        f"/v1/decision-prompts/{approval_id}?version=v2",
+        headers=approver_headers(),
+    ).json()
+
+    result = client.post(
+        f"/v1/approvals/{approval_id}/approve-and-resume",
+        headers=approver_headers(),
+        json={
+            "decided_by": "owner",
+            "jit_ttl_seconds": 60,
+            "expected_contract_digest": prompt["contract_digest"],
+            "expected_impact_digest": "f" * 64,
+        },
+    )
+    assert result.status_code == 409
+    assert adapter.executions == []
+
+
 def test_allow_once_from_prompt_resumes_exact_pending_action(setup):
     client, adapter = setup
     pending = client.post(
