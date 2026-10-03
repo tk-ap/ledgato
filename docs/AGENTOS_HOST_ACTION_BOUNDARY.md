@@ -83,6 +83,8 @@ Only these files can be installed:
 - `agentos-board-projection.timer`
 - `agentos-workspace-board-publisher.service`
 - `agentos-board-projection.service.d/20-workspace-board-publisher.conf`
+- `agentos-youtube-ingestion.service`
+- `agentos-youtube-ingestion.timer`
 - `/usr/local/libexec/agentos-runtime-sync` from
   `runtime/agentos_runtime_sync.sh`
 
@@ -178,12 +180,15 @@ The activation helper performs only the following bounded sequence:
 4. reload the system systemd manager;
 5. run `agentos-runtime-checkout.service` once to provision the account-owned
    clean runtime from the root-owned local mirror;
-6. enable/start `agentos-runtime-checkout.timer` and
-   `agentos-board-projection.timer`;
-7. run one board projection, whose existing `OnSuccess` hook publishes the
+6. create the fixed `/var/lib/agent-os/youtube-ingestion` state directory owned
+   by the `agentos` runtime account;
+7. enable/start `agentos-runtime-checkout.timer`,
+   `agentos-board-projection.timer`, and `agentos-youtube-ingestion.timer`;
+8. run one bounded YouTube ingestion pass;
+9. run one board projection, whose existing `OnSuccess` hook publishes the
    matching snapshot;
-8. verify the runtime checkout is clean/canonical, both timers are active and
-   enabled, and the runtime revision matches the root-owned canonical mirror.
+10. verify the runtime checkout is clean/canonical, all enabled timers are active,
+    and the runtime revision matches the root-owned canonical mirror.
 
 Any failed step fails the Ledgato execution rather than widening the operation.
 
