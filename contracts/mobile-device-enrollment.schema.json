@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/mobile-device-enrollment.schema.json",
+  "title": "LEDGATo Mobile Device Enrollment",
+  "description": "Contract specification for enrolling one trusted mobile approval device. Existence of this schema does not imply endpoint implementation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "device_public_key",
+    "key_algorithm",
+    "attestation",
+    "client"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.mobile-device-enrollment/v1"
+    },
+    "device_public_key": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_algorithm": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Must match the separately reviewed iOS security protocol; this schema does not choose the algorithm."
+    },
+    "key_id_hint": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Opaque platform integrity evidence validated server-side; exact App Attest payload is fixed by the reviewed security protocol."
+    },
+    "client": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform",
+        "app_version",
+        "build"
+      ],
+      "properties": {
+        "platform": {
+          "const": "ios"
+        },
+        "app_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
