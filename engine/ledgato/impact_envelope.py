@@ -66,7 +66,10 @@ def _direct_change(item: Any, *, trusted: bool = False) -> dict[str, Any] | None
         "kind": _enum(item.get("kind"), CHANGE_KINDS, "OTHER"),
         "subject": subject,
         "summary": summary,
-        "confidence": (\n            _enum(item.get("confidence"), CONFIDENCE, "UNKNOWN")\n            if trusted else "INFERRED"\n        ),
+        "confidence": (
+            _enum(item.get("confidence"), CONFIDENCE, "UNKNOWN")
+            if trusted else "INFERRED"
+        ),
         "evidence_refs": _evidence_refs(item.get("evidence_refs")),
     }
 
@@ -120,7 +123,10 @@ def _fallback_direct(approval: "Approval") -> list[dict[str, Any]]:
 
 def build(approval: "Approval", *, action_contract_digest: str) -> dict[str, Any]:
     context = approval.decision_context if isinstance(approval.decision_context, dict) else {}
-    # impact_context currently arrives on the governed agent request. Treat it\n    # as advisory hints only: the actor asking for authority cannot self-certify\n    # its own blast-radius claims as KNOWN.\n    supplied = context.get("impact_context")
+    # impact_context currently arrives on the governed agent request. Treat it
+    # as advisory hints only: the actor asking for authority cannot self-certify
+    # its own blast-radius claims as KNOWN.
+    supplied = context.get("impact_context")
     supplied = supplied if isinstance(supplied, dict) else {}
 
     direct = [
