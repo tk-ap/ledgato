@@ -21,7 +21,7 @@ from .adapters.github import GitHubAdapter
 from .adapters.host import HostActionAdapter
 from .adapters.x402 import X402Adapter
 from .approvals import ApprovalStore
-from .decision_prompt import from_approval as decision_prompt_from_approval
+from .decision_prompt import (\n    from_approval as decision_prompt_from_approval,\n    from_approval_v2 as decision_prompt_v2_from_approval,\n)
 from .principals import (
     IdentityClaimError,
     Principal,
@@ -175,7 +175,7 @@ class GatewayRequest(BaseModel):
     attack_surface: Optional[list[str]] = None
     # Execution metadata only; grants nothing.
     executor_provider: Optional[str] = None
-
+    # Advisory impact facts only; grants no authority.\n    impact_context: Optional[dict[str, Any]] = None\n
 
 class CampaignRegisterRequest(BaseModel):
     principal_id: str
@@ -585,6 +585,7 @@ def create_app(
                 requested_by=principal.id,
                 idempotency_key=req.idempotency_key,
                 campaign_context=campaign_context,
+                impact_context=req.impact_context,
             )
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -668,22 +669,27 @@ def create_app(
     def list_approvals(status: str | None = None):
         return {"approvals": [a.to_dict() for a in approvals.list(status=status)]}
 
-    @app.get("/v1/decision-prompts")
-    def list_decision_prompts(
+
+    def _decision_prompt(item, version: str):
+        if version == "v2":
+            return decision_prompt_v2_from_approval(item).to_dict()
+        return _decision_prompt(item, version)
+\n    @app.get("/v1/decision-prompts")\n    def list_decision_prompts(
         status: str | None = "PENDING",
+        version: Literal["v1", "v2"] = "v1",
         principal: Principal = Depends(_principal),
     ):
         _require_role(principal, allowed={"approver", "admin"}, action="read decision prompts")
         return {
             "prompts": [
-                decision_prompt_from_approval(item).to_dict()
-                for item in approvals.list(status=status)
+                _decision_prompt(item, version)\n                for item in approvals.list(status=status)
             ]
         }
 
     @app.get("/v1/decision-prompts/{approval_id}")
     def get_decision_prompt(
         approval_id: str,
+        version: Literal["v1", "v2"] = "v1",
         principal: Principal = Depends(_principal),
     ):
         _require_role(principal, allowed={"approver", "admin"}, action="read decision prompts")
