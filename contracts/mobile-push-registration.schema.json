@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/mobile-push-registration.schema.json",
+  "title": "LEDGATo Mobile Push Registration",
+  "description": "Registers notification delivery metadata for an already authenticated and enrolled device. Push registration is transport state only and grants no authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "device_id",
+    "provider",
+    "push_token",
+    "app_environment"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.mobile-push-registration/v1"
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "const": "apns"
+    },
+    "push_token": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Delivery token only; never an approval credential."
+    },
+    "app_environment": {
+      "enum": [
+        "development",
+        "staging",
+        "production"
+      ]
+    },
+    "app_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "build": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
