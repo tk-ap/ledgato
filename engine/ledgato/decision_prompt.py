@@ -226,7 +226,7 @@ def from_approval_v2(approval: Approval) -> DecisionPromptV2:
     )
 
 def render_text(prompt: DecisionPrompt | DecisionPromptV2 | dict[str, Any]) -> str:
-    data = prompt.to_dict() if isinstance(prompt, DecisionPrompt) else prompt
+    data = prompt.to_dict() if isinstance(prompt, (DecisionPrompt, DecisionPromptV2)) else prompt
     action = data["requested_action"]
     boundary = data["boundary"]
     lines = [
