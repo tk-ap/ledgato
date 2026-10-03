@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/mobile-signed-decision.schema.json",
+  "title": "LEDGATo Mobile Signed Decision",
+  "description": "Device-signed response for exactly one server challenge. Signature algorithm/encoding must follow the separately reviewed iOS security protocol.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "approval_id",
+    "contract_digest",
+    "representation_version",
+    "challenge_nonce",
+    "decision",
+    "device_id",
+    "key_id",
+    "signed_at",
+    "signature"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.mobile-signed-decision/v1"
+    },
+    "approval_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contract_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "representation_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "challenge_nonce": {
+      "type": "string",
+      "minLength": 16
+    },
+    "decision": {
+      "enum": [
+        "APPROVE",
+        "DENY"
+      ]
+    },
+    "device_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
