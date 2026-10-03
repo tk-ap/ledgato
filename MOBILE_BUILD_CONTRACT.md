@@ -502,6 +502,24 @@ Choose final enum spelling in the versioned evidence contract; do not conflate t
 
 If AgentOS can execute an exact bounded command after owner authorization, prefer the signed approval path instead of requiring the human to open a terminal.
 
+## 19A. Privileged governed host actions
+
+The first mobile approval proof does not require the privileged host-action broker.
+
+After the first proof, bounded elevated operations should follow `PRIVILEGED_HOST_ACTION_BROKER.md` rather than require a terminal merely because the command needs sudo/root privilege.
+
+Do not store or forward the operator's sudo password.
+
+A privileged action is still an exact LEDGATo action-contract decision. The root-owned broker consumes the resulting single-use permit and executes a typed allowlisted handler.
+
+Examples:
+
+- restart one allowlisted service;
+- apply one deterministic known runtime repair;
+- install one already-verified artifact to one allowlisted destination.
+
+Arbitrary root shell execution remains out of scope.
+
 ## 20. Host Action input boundary
 
 The mobile app must not independently discover local hosts, SSH credentials, tmux sessions, Herdr workspaces, or deferred AgentOS tasks.

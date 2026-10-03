@@ -329,6 +329,24 @@ The mobile client should eventually make the enforcement model tangible:
 - trusted approver devices;
 - revocation/containment.
 
+## Privileged host-action broker direction
+
+For bounded host operations that need elevated OS privilege but do not genuinely require human interactive execution, use the architecture in [`PRIVILEGED_HOST_ACTION_BROKER.md`](./PRIVILEGED_HOST_ACTION_BROKER.md).
+
+Core rule:
+
+> **Do not forward the human's reusable sudo password. Authorize one exact privileged host action and let a root-owned protected broker execute it.**
+
+The broker should reuse the existing LEDGATo action-contract and signed one-use permit model. It is a protected resource, not a second authorization system.
+
+This creates three distinct lanes:
+
+1. normal governed action;
+2. privileged governed host action via the broker;
+3. genuinely interactive human operator action via Moshi/SSH.
+
+"Needs sudo" should not automatically mean "needs a terminal."
+
 ## Operator terminal / SSH / Moshi direction
 
 A remote terminal is realistic and potentially valuable, but it must be architected as **operator access**, not as a second LEDGATo authority or AgentOS execution path.
