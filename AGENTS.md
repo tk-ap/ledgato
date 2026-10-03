@@ -85,6 +85,22 @@ Preserve these additional rules:
 - prefer interoperability with MCP/A2A/runtime-control/workload-identity standards over rebuilding their commodity layers;
 - signed protocol intent is provenance/evidence, not sufficient authorization.
 
+### Impact-aware approval-plane guardrail
+
+For approval/decision-prompt work, read `IMPACT_ENVELOPE.md`.
+
+Preserve these rules:
+
+- impact analysis belongs to the canonical approval plane, not to mobile or any transport;
+- all approval surfaces render the same server-derived impact semantics;
+- impact is advisory context and never directly grants authority;
+- distinguish `KNOWN`, `INFERRED`, and `UNKNOWN` impact;
+- prefer deterministic provider/repository/runtime evidence for create/modify/replace/delete/grant/revoke classifications;
+- bind the impact-envelope digest to the decision representation when using decision-prompt v2;
+- if the exact action or material impact facts change before consumption, recompute/revalidate and supersede the approval when policy requires;
+- preserve current decision-prompt v1 evidence truth until v2 is actually implemented and verified;
+- do not require a synthetic risk score.
+
 ## Native Operator App Guardrail
 
 The approved native mobile direction is recorded in `MOBILE_OPERATOR_APP_DIRECTION.md`. Read it before planning or implementing mobile approvals, push notifications, trusted-device enrollment, biometric confirmation, device signing, App Store / Play Store clients, or changes intended to replace Telegram as an approval surface.
