@@ -71,6 +71,21 @@ must never grant authority.
 
 A skill/prompt may help an agent understand Ledgato responses, but it is not an enforcement boundary. Prefer adapters, SDK/gateway hooks, or other execution-path controls that the agent cannot simply reason around.
 
+## Native Operator App Guardrail
+
+The approved native mobile direction is recorded in `MOBILE_OPERATOR_APP_DIRECTION.md`. Read it before planning or implementing mobile approvals, push notifications, trusted-device enrollment, biometric confirmation, device signing, App Store / Play Store clients, or changes intended to replace Telegram as an approval surface.
+
+Preserve these rules:
+
+- the mobile app is an authenticated decision client, not the authorization authority or execution runtime;
+- push is notification only; APNs/FCM delivery or interaction must never constitute approval;
+- LEDGATo server state remains authoritative for scope, status, expiry, decision consumption, and evidence;
+- approvals must be exact-scope, expiring, replay-resistant, single-use, and fail closed;
+- biometric success gates a device-bound signing operation; it is not sufficient server proof by itself;
+- Telegram may remain a fallback during migration but must not become a second independent source of authorization truth;
+- security-critical device/signing/resume paths require explicit tests and independent verification, not only an agent-authored security review;
+- do not start the product build until the AgentOS E2E autonomy/persistence implementation gate in `MOBILE_OPERATOR_APP_DIRECTION.md` is satisfied.
+
 ## Progressive Authority Calibration Guardrail
 
 When designing or implementing onboarding, authority configuration, approval learning, or policy refinement, read the Progressive Authority Calibration section of `PRODUCT_DIRECTION.md`.
