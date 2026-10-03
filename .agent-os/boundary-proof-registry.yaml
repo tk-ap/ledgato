@@ -1,0 +1,135 @@
+version: 1
+updated_at: "2026-10-03"
+product: ledgato
+portfolio_doc: BOUNDARY_PROOF_PORTFOLIO.md
+
+evidence_grades:
+  EXTERNAL_CUSTOMER_VERIFIED: "independently verified in a real external customer workflow"
+  LIVE_PROVIDER_VERIFIED: "real provider/resource, bypass-tested and independently verified in a controlled lab"
+  LOCAL_RESOURCE_VERIFIED: "separate protected process/resource with cryptographic enforcement, but synthetic/local"
+  IMPLEMENTED_BOUNDED: "narrow real integration exists; complete boundary proof remains"
+  IMPLEMENTED_UNVERIFIED: "adapter exists/tests pass; no complete live boundary proof"
+  CORE_SEMANTICS_TESTED: "underlying authority semantics tested; no complete case study"
+  DIRECTION_ONLY: "product/architecture target only"
+
+claim_rules:
+  - "Policy decisions alone never upgrade evidence grade."
+  - "Unit tests alone never establish live-provider enforcement."
+  - "Non-bypassable claims require alternate-route evidence."
+  - "Strongest lab/provider grade requires independent verification."
+  - "External-customer grade requires evidence outside the founder environment."
+  - "Website, UI, sales, demos, and agent summaries must not exceed claim_scope."
+
+boundaries:
+  github.pull.merge:
+    class: source_control
+    evidence_grade: LIVE_PROVIDER_VERIFIED
+    external_customer_verified: false
+    implemented: true
+    provider_backed: true
+    independent_verification: true
+    provider_readback: true
+    alternate_route_testing: true
+    claim_scope: "Verified under the documented GitHub lab architecture when the governed agent lacks an equivalent merge path."
+    evidence_refs:
+      - INDEPENDENT_VERIFICATION_RESULT.md
+      - DESIGN_PARTNER_GITHUB_PILOT.md
+      - docs/pilot/GITHUB_ENFORCEMENT_OFFER.md
+
+  generic.signed_permit_resource:
+    class: protected_resource
+    evidence_grade: LOCAL_RESOURCE_VERIFIED
+    external_customer_verified: false
+    implemented: true
+    provider_backed: false
+    independent_verification: false
+    provider_readback: resource_receipt
+    alternate_route_testing: true
+    claim_scope: "A separate resource can require an exact Ledgato-signed single-use permit before performing an effect."
+    evidence_refs:
+      - engine/ENFORCEMENT_BOUNDARY_PROOF.md
+      - engine/tests/test_enforcement_boundary.py
+
+  host.agentos.runtime.activate:
+    class: privileged_host
+    evidence_grade: IMPLEMENTED_BOUNDED
+    external_customer_verified: false
+    implemented: true
+    provider_backed: host_os
+    independent_verification: false
+    provider_readback: true
+    alternate_route_testing: partial
+    claim_scope: "A bounded AgentOS host-action path exists; complete privileged-host proof remains."
+    evidence_refs:
+      - docs/AGENTOS_HOST_ACTION_BOUNDARY.md
+      - PRIVILEGED_HOST_ACTION_BROKER.md
+      - engine/tests/test_host_adapter.py
+    next_proof: privileged_host_case_study
+
+  x402.pay:
+    class: spending
+    evidence_grade: IMPLEMENTED_UNVERIFIED
+    external_customer_verified: false
+    implemented: true
+    provider_backed: protocol_adapter
+    independent_verification: false
+    provider_readback: settlement_evidence_only
+    alternate_route_testing: false
+    claim_scope: "The payment adapter is implemented and CI-tested; no live spending-boundary claim."
+    evidence_refs:
+      - docs/X402_ADAPTER.md
+      - engine/tests/test_x402_adapter.py
+    next_proof: safe_test_network_spending_case_study
+
+  protected_credential.operation:
+    class: credential_authority
+    evidence_grade: DIRECTION_ONLY
+    external_customer_verified: false
+    implemented: false
+    claim_scope: "No standalone protected-credential operation case study."
+    next_proof: credential_backed_operation_without_credential_disclosure
+
+  outbound.publish_or_send:
+    class: external_communication
+    evidence_grade: DIRECTION_ONLY
+    external_customer_verified: false
+    implemented: false
+    claim_scope: "No outbound send/publish enforcement case study."
+    next_proof: exact_destination_and_content_wysiws_case_study
+
+  protected_data.mutate_or_delete:
+    class: protected_data
+    evidence_grade: DIRECTION_ONLY
+    external_customer_verified: false
+    implemented: false
+    claim_scope: "No protected-data mutation/deletion enforcement case study."
+    next_proof: disposable_database_or_storage_case_study
+
+  agent.delegation:
+    class: delegated_agent_authority
+    evidence_grade: CORE_SEMANTICS_TESTED
+    external_customer_verified: false
+    implemented: partial
+    claim_scope: "Delegation/JIT/revocation semantics have tests; no coherent provider-backed delegation case study."
+    evidence_refs:
+      - INDEPENDENT_VERIFICATION_RESULT.md
+      - engine/ledgato/authority.py
+    next_proof: supervisor_worker_delegation_case_study
+
+  cloud.infrastructure.change:
+    class: cloud_infrastructure
+    evidence_grade: DIRECTION_ONLY
+    external_customer_verified: false
+    implemented: false
+    claim_scope: "No cloud-provider infrastructure enforcement case study."
+    next_proof: disposable_reversible_staging_resource_case_study
+
+proof_sequence:
+  - github.pull.merge
+  - host.agentos.runtime.activate
+  - protected_credential.operation
+  - outbound.publish_or_send
+  - x402.pay
+  - protected_data.mutate_or_delete
+  - agent.delegation
+  - cloud.infrastructure.change

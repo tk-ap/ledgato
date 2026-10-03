@@ -2,6 +2,7 @@ version: 0.1.0
 product_key: ledgato
 agent_os_repository: tk-ap/agent-os
 routing_source: registry/product-routing.yaml
+boundary_proof_registry: .agent-os/boundary-proof-registry.yaml
 repository: tk-ap/ledgato
 
 local:
@@ -44,6 +45,7 @@ local:
     - distinguish-engine-implementation-from-deployed-and-user-validated-enforcement
     - signed-evidence-does-not-by-itself-grant-execution-authority
     - production-runtime-and-buyer-proof-remain-evidence-dependent
+    - boundary-claims-must-not-exceed-boundary-proof-registry
 
 rules:
   canonical_product_role_from_routing_source: true
