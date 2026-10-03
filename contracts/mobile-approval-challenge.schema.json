@@ -15,7 +15,9 @@
     "expires_at",
     "state",
     "operator_view",
-    "provenance"
+    "provenance",
+    "impact_envelope_digest",
+    "impact_preview"
   ],
   "properties": {
     "version": {
@@ -147,6 +149,162 @@
           ]
         },
         "context_sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "impact_envelope_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "impact_preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolution_state",
+        "direct_changes",
+        "related_impacts",
+        "reversibility",
+        "novelty",
+        "unknowns"
+      ],
+      "properties": {
+        "resolution_state": {
+          "enum": [
+            "COMPLETE",
+            "PARTIAL",
+            "UNAVAILABLE"
+          ]
+        },
+        "direct_changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "summary",
+              "confidence"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "confidence": {
+                "enum": [
+                  "KNOWN",
+                  "INFERRED",
+                  "UNKNOWN"
+                ]
+              }
+            }
+          }
+        },
+        "related_impacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "category",
+              "subject",
+              "effect",
+              "extent",
+              "confidence"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "effect": {
+                "type": "string"
+              },
+              "extent": {
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH",
+                  "UNKNOWN"
+                ]
+              },
+              "confidence": {
+                "enum": [
+                  "KNOWN",
+                  "INFERRED",
+                  "UNKNOWN"
+                ]
+              }
+            }
+          }
+        },
+        "reversibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "class",
+            "summary",
+            "confidence"
+          ],
+          "properties": {
+            "class": {
+              "enum": [
+                "REVERSIBLE",
+                "PARTIALLY_REVERSIBLE",
+                "IRREVERSIBLE",
+                "UNKNOWN"
+              ]
+            },
+            "summary": {
+              "type": "string"
+            },
+            "confidence": {
+              "enum": [
+                "KNOWN",
+                "INFERRED",
+                "UNKNOWN"
+              ]
+            }
+          }
+        },
+        "novelty": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "class",
+            "summary",
+            "confidence"
+          ],
+          "properties": {
+            "class": {
+              "enum": [
+                "KNOWN_REPEATED",
+                "KNOWN_CHANGED",
+                "NEW",
+                "UNKNOWN"
+              ]
+            },
+            "summary": {
+              "type": "string"
+            },
+            "confidence": {
+              "enum": [
+                "KNOWN",
+                "INFERRED",
+                "UNKNOWN"
+              ]
+            }
+          }
+        },
+        "unknowns": {
           "type": "array",
           "items": {
             "type": "string"
