@@ -71,6 +71,20 @@ must never grant authority.
 
 A skill/prompt may help an agent understand Ledgato responses, but it is not an enforcement boundary. Prefer adapters, SDK/gateway hooks, or other execution-path controls that the agent cannot simply reason around.
 
+## Strategic Architecture Reference
+
+Before material enforcement architecture, protocol interoperability, production-hardening, or operator-terminal work, read `STRATEGIC_ARCHITECTURE_DIRECTION_2026-10.md`.
+
+Preserve these additional rules:
+
+- converge the live provider-backed proof and signed-permit proof rather than creating parallel production paths;
+- treat exact request/parameter binding, shared transactional state, provider/resource-originated evidence, and elimination of equivalent bypass credentials as production architecture requirements;
+- preserve what-you-see-is-what-you-sign for human approval;
+- bind consequential actions to relevant tool/server/schema provenance;
+- preserve consequential context-source provenance when supplied by the runtime, without turning context into authority;
+- prefer interoperability with MCP/A2A/runtime-control/workload-identity standards over rebuilding their commodity layers;
+- signed protocol intent is provenance/evidence, not sufficient authorization.
+
 ## Native Operator App Guardrail
 
 The approved native mobile direction is recorded in `MOBILE_OPERATOR_APP_DIRECTION.md`. Read it before planning or implementing mobile approvals, push notifications, trusted-device enrollment, biometric confirmation, device signing, App Store / Play Store clients, or changes intended to replace Telegram as an approval surface.
@@ -85,6 +99,20 @@ Preserve these rules:
 - Telegram may remain a fallback during migration but must not become a second independent source of authorization truth;
 - security-critical device/signing/resume paths require explicit tests and independent verification, not only an agent-authored security review;
 - do not start the product build until the AgentOS E2E autonomy/persistence implementation gate in `MOBILE_OPERATOR_APP_DIRECTION.md` is satisfied.
+
+### Operator terminal / Moshi guardrail
+
+If mobile work touches SSH, Mosh, Moshi, Herdr, tmux, remote shell access, or terminal-level intervention:
+
+- treat Moshi/SSH/Mosh as **operator access**, never as LEDGATo approval authority;
+- opening a shell, attaching to a session, or typing a command must not create or imply an `APPROVE` decision;
+- prefer documented Moshi deep links for active sessions before rebuilding a terminal client;
+- preserve the existing private-network/key-only host-access posture; do not expose a public shell for convenience;
+- when an exact command only needs human authorization, use the normal signed LEDGATo approval path and let AgentOS execute it;
+- reserve manual terminal access for genuinely human-only/interactive intervention;
+- AgentOS remains canonical for deferred operator actions and execution lifecycle;
+- completion of a manual intervention requires runtime/provider evidence, not a UI checkbox;
+- do not embed Mosh/Blink/Moshi-derived code without explicit license/security review.
 
 ## Progressive Authority Calibration Guardrail
 
