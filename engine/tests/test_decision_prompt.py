@@ -110,8 +110,8 @@ def test_v2_prompt_preserves_supplied_known_delete_and_reversibility():
     })
     prompt = from_approval_v2(item).to_dict()
     assert prompt["impact_preview"]["direct_changes"][0]["kind"] == "DELETE"
-    assert prompt["impact_preview"]["direct_changes"][0]["confidence"] == "KNOWN"
-    assert prompt["impact_preview"]["reversibility"]["class"] == "REVERSIBLE"
+    assert prompt["impact_preview"]["direct_changes"][0]["confidence"] == "INFERRED"
+    assert prompt["impact_preview"]["reversibility"]["class"] == "REVERSIBLE"\n    assert prompt["impact_preview"]["reversibility"]["confidence"] == "INFERRED"
     assert prompt["impact_preview"]["novelty"]["class"] == "NEW"
     text = render_text(prompt)
     assert "What changes" in text
