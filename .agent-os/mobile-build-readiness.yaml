@@ -29,6 +29,7 @@ required_gates:
     evidence_refs:
       - "contracts/mobile-device-enrollment.schema.json"
       - "contracts/mobile-push-envelope.schema.json"
+      - "contracts/mobile-push-registration.schema.json"
       - "contracts/mobile-approval-challenge.schema.json"
       - "contracts/mobile-signed-decision.schema.json"
       - "contracts/mobile-approval-receipt.schema.json"
