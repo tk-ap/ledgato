@@ -24,6 +24,22 @@ inbound:
     purpose: evaluate declared authority for governed work against the applicable policy (POST /v1/authority/resolve)
     evidence_state: implemented, tested; status store is in-memory
 
+  - from: ledgato-mobile-operator
+    repository: tk-ap/ledgato
+    contract: contracts/mobile-device-enrollment.schema.json
+    purpose: enroll one authenticated operator device public key and platform-integrity evidence
+    evidence_state: specification only; not implemented
+  - from: ledgato-mobile-operator
+    repository: tk-ap/ledgato
+    contract: contracts/mobile-push-registration.schema.json
+    purpose: bind one APNs delivery token to an already authenticated/enrolled device without creating authority
+    evidence_state: specification only; not implemented
+  - from: ledgato-mobile-operator
+    repository: tk-ap/ledgato
+    contract: contracts/mobile-signed-decision.schema.json
+    purpose: submit a device-signed APPROVE or DENY response for one exact server challenge
+    evidence_state: specification only; not implemented
+
 outbound:
   - to: agent-os-workforce
     contract: contracts/outcome-event.schema.json
@@ -48,6 +64,22 @@ outbound:
     contract: contracts/authority-status.schema.json
     trigger: readiness state for a work item changes (GET /v1/authority/status/{work_id})
     evidence_state: implemented, tested; in-memory, lost on restart
+
+  - to: ledgato-mobile-operator
+    repository: tk-ap/ledgato
+    contract: contracts/mobile-push-envelope.schema.json
+    trigger: a pending/updated approval should wake the operator client; delivery never grants authority
+    evidence_state: specification only; not implemented
+  - to: ledgato-mobile-operator
+    repository: tk-ap/ledgato
+    contract: contracts/mobile-approval-challenge.schema.json
+    trigger: an authenticated mobile client fetches one authoritative approval challenge
+    evidence_state: specification only; not implemented
+  - to: ledgato-mobile-operator
+    repository: tk-ap/ledgato
+    contract: contracts/mobile-approval-receipt.schema.json
+    trigger: the operator client requests the resulting decision/execution/provider-verification read model
+    evidence_state: specification only; not implemented
 
 cross_market: []
 
