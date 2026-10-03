@@ -112,6 +112,21 @@ For any task that would create or modify native LEDGATo mobile application code,
 
 The first-user scope is one operator, one tenant/account context, one physical iPhone, one AgentOS environment, one protected action. Do not introduce organizations, teams, RBAC, quorum approval, Android parity, policy editing, or embedded terminal scope into the first proof.
 
+### Privileged host-action broker guardrail
+
+For work involving sudo/root/elevated host actions, read `PRIVILEGED_HOST_ACTION_BROKER.md`.
+
+Preserve these rules:
+
+- never solve agent privilege by storing/forwarding the human sudo password;
+- reuse the existing action-contract + signed enforcement-permit model rather than inventing a sudo token;
+- a root-owned broker may execute only typed, allowlisted privileged actions;
+- no generic root shell, `sudo -S`, `NOPASSWD: ALL`, arbitrary `systemctl`, or shell/interpreter endpoint;
+- broker handlers and executable paths must not be writable by the governed agent account;
+- exact approved action must equal executed action and verified host effect;
+- privileged broker actions and human Moshi/operator actions are distinct evidence classes;
+- broker unavailability must not fall back to reusable-password forwarding.
+
 ### Operator terminal / Moshi guardrail
 
 If mobile work touches SSH, Mosh, Moshi, Herdr, tmux, remote shell access, or terminal-level intervention:
