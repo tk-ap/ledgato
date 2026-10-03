@@ -55,7 +55,7 @@ def _evidence_refs(value: Any) -> list[str]:
     return [_text(item, limit=220) for item in value[:12] if _text(item, limit=220)]
 
 
-def _direct_change(item: Any) -> dict[str, Any] | None:
+def _direct_change(item: Any, *, trusted: bool = False) -> dict[str, Any] | None:
     if not isinstance(item, dict):
         return None
     subject = _text(item.get("subject"))
@@ -66,12 +66,12 @@ def _direct_change(item: Any) -> dict[str, Any] | None:
         "kind": _enum(item.get("kind"), CHANGE_KINDS, "OTHER"),
         "subject": subject,
         "summary": summary,
-        "confidence": _enum(item.get("confidence"), CONFIDENCE, "UNKNOWN"),
+        "confidence": (\n            _enum(item.get("confidence"), CONFIDENCE, "UNKNOWN")\n            if trusted else "INFERRED"\n        ),
         "evidence_refs": _evidence_refs(item.get("evidence_refs")),
     }
 
 
-def _related_impact(item: Any) -> dict[str, Any] | None:
+def _related_impact(item: Any, *, trusted: bool = False) -> dict[str, Any] | None:
     if not isinstance(item, dict):
         return None
     subject = _text(item.get("subject"))
@@ -83,7 +83,10 @@ def _related_impact(item: Any) -> dict[str, Any] | None:
         "subject": subject,
         "effect": effect,
         "extent": _enum(item.get("extent"), EXTENT, "UNKNOWN"),
-        "confidence": _enum(item.get("confidence"), CONFIDENCE, "UNKNOWN"),
+        "confidence": (
+            _enum(item.get("confidence"), CONFIDENCE, "UNKNOWN")
+            if trusted else "INFERRED"
+        ),
         "evidence_refs": _evidence_refs(item.get("evidence_refs")),
     }
 
@@ -117,18 +120,18 @@ def _fallback_direct(approval: "Approval") -> list[dict[str, Any]]:
 
 def build(approval: "Approval", *, action_contract_digest: str) -> dict[str, Any]:
     context = approval.decision_context if isinstance(approval.decision_context, dict) else {}
-    supplied = context.get("impact_context")
+    # impact_context currently arrives on the governed agent request. Treat it\n    # as advisory hints only: the actor asking for authority cannot self-certify\n    # its own blast-radius claims as KNOWN.\n    supplied = context.get("impact_context")
     supplied = supplied if isinstance(supplied, dict) else {}
 
     direct = [
-        parsed for parsed in (_direct_change(item) for item in supplied.get("direct_changes", []))
+        parsed for parsed in (_direct_change(item, trusted=False) for item in supplied.get("direct_changes", []))
         if parsed is not None
     ][:16]
     if not direct:
         direct = _fallback_direct(approval)
 
     related = [
-        parsed for parsed in (_related_impact(item) for item in supplied.get("related_impacts", []))
+        parsed for parsed in (_related_impact(item, trusted=False) for item in supplied.get("related_impacts", []))
         if parsed is not None
     ][:16]
     if approval.task_id and not any(
@@ -152,7 +155,7 @@ def build(approval: "Approval", *, action_contract_digest: str) -> dict[str, Any
             raw_rev.get("summary")
             or "Reversibility has not yet been established for this exact action."
         ),
-        "confidence": _enum(raw_rev.get("confidence"), CONFIDENCE, "UNKNOWN"),
+        "confidence": "INFERRED" if raw_rev else "UNKNOWN",
         "evidence_refs": _evidence_refs(raw_rev.get("evidence_refs")),
     }
 
@@ -164,7 +167,7 @@ def build(approval: "Approval", *, action_contract_digest: str) -> dict[str, Any
             raw_novelty.get("summary")
             or "No sufficiently similar proven action has been established in this envelope."
         ),
-        "confidence": _enum(raw_novelty.get("confidence"), CONFIDENCE, "UNKNOWN"),
+        "confidence": "INFERRED" if raw_novelty else "UNKNOWN",
         "evidence_refs": _evidence_refs(raw_novelty.get("evidence_refs")),
     }
 
