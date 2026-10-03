@@ -60,6 +60,23 @@ Agent / agent workforce
 
 Every discovered bypass is a product failure for that boundary until remediated.
 
+## Boundary proof portfolio
+
+Ledgato does not treat adapter count as proof of enforcement coverage.
+
+The canonical maturity record for each supported or planned boundary is
+[`.agent-os/boundary-proof-registry.yaml`](./.agent-os/boundary-proof-registry.yaml),
+with the shared case-study standard in
+[`BOUNDARY_PROOF_PORTFOLIO.md`](./BOUNDARY_PROOF_PORTFOLIO.md).
+
+Product copy, demos, UI, pilots, and agent-generated summaries must not describe
+a boundary at a stronger evidence level than that registry records.
+
+The current reference proof is the independently verified GitHub merge boundary.
+Other boundary classes are explicitly labeled as local proof, bounded
+implementation, unverified implementation, tested core semantics, or direction
+only until they earn stronger evidence.
+
 ## What it does
 
 1. **Declare & map** — Represent the tools, data domains, endpoints, impact, and other authority an agent is intended to have, then compare that declaration with the surface it can reach.
