@@ -317,6 +317,27 @@ Use documented Moshi deep links for already-active Herdr/tmux sessions when a re
 
 Do not depend on undocumented `moshi-hook` internals as a product contract.
 
+### Privileged governed host actions
+
+A later operator-app capability may approve a bounded privileged host action without opening a terminal.
+
+Use `PRIVILEGED_HOST_ACTION_BROKER.md`.
+
+The intended path is:
+
+```text
+exact typed host action
+→ LEDGATo mobile approval
+→ signed one-use permit
+→ root-owned host broker
+→ host verification
+→ AgentOS resumes
+```
+
+Do not store or forward the operator's sudo password. Do not treat generic root shell access as the normal mechanism for elevated agent work.
+
+This is post-first-slice scope and must not expand the initial mobile approval proof.
+
 ### When terminal access is appropriate
 
 Use operator terminal access for interventions that genuinely require the human, such as:
