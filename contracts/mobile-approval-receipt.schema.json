@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/mobile-approval-receipt.schema.json",
+  "title": "LEDGATo Mobile Approval Receipt",
+  "description": "Read model for the operator. Provider/resource evidence is the final witness of consequential impact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "approval_id",
+    "decision",
+    "authority_state",
+    "execution_state",
+    "verification_state",
+    "evidence_refs"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.mobile-approval-receipt/v1"
+    },
+    "approval_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "enum": [
+        "APPROVED",
+        "DENIED",
+        "EXPIRED",
+        "REVOKED",
+        "SUPERSEDED"
+      ]
+    },
+    "authority_state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_state": {
+      "enum": [
+        "NOT_EXECUTED",
+        "EXECUTED",
+        "UNKNOWN",
+        "PARTIAL"
+      ]
+    },
+    "verification_state": {
+      "enum": [
+        "VERIFIED",
+        "NOT_VERIFIED",
+        "PENDING",
+        "UNAVAILABLE"
+      ]
+    },
+    "executed_by": {
+      "enum": [
+        "AGENT_GOVERNED",
+        "HUMAN_OPERATOR",
+        "NONE",
+        "UNKNOWN"
+      ]
+    },
+    "provider_summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "permit_or_resume_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "observed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}

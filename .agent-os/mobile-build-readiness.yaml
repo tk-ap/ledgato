@@ -1,0 +1,52 @@
+version: 1
+product: ledgato
+capability: native-operator-app
+ready_for_first_vertical_slice: false
+updated_at: "2026-10-03"
+
+rules:
+  - readiness_is_fail_closed
+  - implementation_agent_must_not_self_promote_readiness
+  - prose_or_issue_state_is_not_sufficient_evidence
+  - explicit_governed_task_authorization_is_still_required_when_ready
+
+required_gates:
+  agentos_e2e_autonomy_persistence:
+    satisfied: false
+    evidence_refs: []
+    requirement: "AgentOS proves durable claim -> execute -> wait/approval -> exact resume -> independent evidence across required runtime lifecycle boundaries."
+
+  ledgato_approval_permit_convergence_contract:
+    satisfied: false
+    evidence_refs:
+      - "MOBILE_BUILD_CONTRACT.md"
+      - "MOBILE_OPERATOR_APP_DIRECTION.md"
+      - "STRATEGIC_ARCHITECTURE_DIRECTION_2026-10.md"
+    requirement: "Canonical design for human APPROVE -> re-evaluate -> signed one-use permit/resume -> exact provider effect is accepted before production-path implementation."
+
+  mobile_contracts_versioned:
+    satisfied: true
+    evidence_refs:
+      - "contracts/mobile-device-enrollment.schema.json"
+      - "contracts/mobile-push-envelope.schema.json"
+      - "contracts/mobile-push-registration.schema.json"
+      - "contracts/mobile-approval-challenge.schema.json"
+      - "contracts/mobile-signed-decision.schema.json"
+      - "contracts/mobile-approval-receipt.schema.json"
+    requirement: "The first-slice mobile/server payload contracts exist and are versioned. Contract existence does not imply endpoint implementation."
+
+  authenticated_operator_bootstrap_resolved:
+    satisfied: false
+    evidence_refs: []
+    requirement: "A concrete existing LEDGATo mechanism is identified that authenticates the human operator before trusted-device enrollment, without the mobile builder inventing a new identity provider."
+
+  ios_security_protocol_selected:
+    satisfied: false
+    evidence_refs: []
+    requirement: "Exact device-bound signing algorithm/key representation, Secure Enclave/Keychain behavior, App Attest binding, key id/rotation/revocation semantics, and server verification format are reviewed and fixed."
+
+notes:
+  first_user_scope: "single operator; single tenant/account context; one trusted physical iPhone; one AgentOS environment; one protected consequential action"
+  android: "deferred"
+  embedded_terminal: "deferred"
+  moshi_handoff: "post-first-slice only; must not be required for approval proof"

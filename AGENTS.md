@@ -100,6 +100,18 @@ Preserve these rules:
 - security-critical device/signing/resume paths require explicit tests and independent verification, not only an agent-authored security review;
 - do not start the product build until the AgentOS E2E autonomy/persistence implementation gate in `MOBILE_OPERATOR_APP_DIRECTION.md` is satisfied.
 
+### Mobile build execution contract
+
+For any task that would create or modify native LEDGATo mobile application code, mobile backend endpoints, device enrollment, push registration, approval signing, or mobile evidence:
+
+1. read `MOBILE_BUILD_CONTRACT.md`;
+2. read `.agent-os/mobile-build-readiness.yaml`;
+3. if `ready_for_first_vertical_slice` is not `true`, do not begin the application build or provision mobile infrastructure;
+4. do not self-promote a readiness gate based on your own implementation or test result;
+5. use the versioned `contracts/mobile-*.schema.json` specifications and preserve their evidence state as specification-only until implemented/tested.
+
+The first-user scope is one operator, one tenant/account context, one physical iPhone, one AgentOS environment, one protected action. Do not introduce organizations, teams, RBAC, quorum approval, Android parity, policy editing, or embedded terminal scope into the first proof.
+
 ### Operator terminal / Moshi guardrail
 
 If mobile work touches SSH, Mosh, Moshi, Herdr, tmux, remote shell access, or terminal-level intervention:
