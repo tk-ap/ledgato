@@ -328,6 +328,20 @@ The product should be understandable as:
 
 The website should communicate that the value happens while the user is **not** in Ledgato. The product is not "another AI dashboard"; the dashboard exists so the human can understand and control an otherwise autonomous enforcement system.
 
+## Native operator app: first-party human authority surface
+
+The approved mobile direction is a native iOS/Android **LEDGATo operator app**. The detailed architecture, security invariants, implementation stack, AgentOS build gate, and first vertical slice are canonicalized in [`MOBILE_OPERATOR_APP_DIRECTION.md`](./MOBILE_OPERATOR_APP_DIRECTION.md).
+
+The mobile app should become the preferred first-party surface for `APPROVE` decisions that currently may arrive through Telegram or other third-party channels. This does **not** move authorization authority into the phone:
+
+> **Push is notification. LEDGATo is authorization. The mobile app is an authenticated decision client. AgentOS remains execution.**
+
+The app must retrieve the server-derived request, bind the human decision to the exact stored action, use a trusted device-bound signing path for consequential approval, and return a verifiable scoped decision to LEDGATo. The originating AgentOS workflow may then resume exactly once after server verification. Push receipt, notification interaction, local biometric success, or client-local state must never be sufficient authority.
+
+Telegram can remain as transition fallback/observability, but the target product removes it as a canonical dependency for human approval. The web console remains the deeper configuration/evidence surface; the phone becomes the low-friction operator surface for time-sensitive authority decisions.
+
+This direction is **approved but implementation-gated**. AgentOS is expected to build the app once the canonical E2E autonomy/persistence proof demonstrates durable claim/pause/resume/evidence behavior. Until that gate is satisfied, preserve the design and avoid speculative breadth.
+
 ## Progressive Authority Calibration
 
 Ledgato should not depend on a comprehensive upfront permissions interview. The authority interview is a **bootstrap and exception-resolution component** inside a broader progressive calibration model.
