@@ -215,11 +215,15 @@ class ApprovalDecisionRequest(BaseModel):
     decided_by: Optional[str] = None
     reason: Optional[str] = None
     jit_ttl_seconds: Optional[int] = 300
+    expected_contract_digest: Optional[str] = None
+    expected_impact_digest: Optional[str] = None
 
 
 class ApprovalDenyRequest(BaseModel):
     decided_by: Optional[str] = None
     reason: Optional[str] = None
+    expected_contract_digest: Optional[str] = None
+    expected_impact_digest: Optional[str] = None
 
 
 class ResumeRequest(BaseModel):
@@ -680,6 +684,31 @@ def create_app(
             return decision_prompt_v2_from_approval(item).to_dict()
         return decision_prompt_from_approval(item).to_dict()
 
+    def _verify_decision_binding(
+        approval_id: str,
+        expected_contract_digest: str | None,
+        expected_impact_digest: str | None,
+    ) -> None:
+        if not expected_contract_digest and not expected_impact_digest:
+            return
+        item = approvals.get(approval_id)
+        if not item:
+            raise HTTPException(404, f"unknown approval '{approval_id}'")
+        current_v1 = decision_prompt_from_approval(item)
+        if (
+            expected_contract_digest
+            and current_v1.contract_digest != expected_contract_digest
+        ):
+            raise HTTPException(
+                409, "the protected action changed since this prompt was rendered"
+            )
+        if expected_impact_digest:
+            current_v2 = decision_prompt_v2_from_approval(item)
+            if current_v2.impact_envelope_digest != expected_impact_digest:
+                raise HTTPException(
+                    409, "the expected impact changed since this prompt was rendered"
+                )
+
     @app.get("/v1/decision-prompts")
     def list_decision_prompts(
         status: str | None = "PENDING",
@@ -716,6 +745,11 @@ def create_app(
         # be the principal that approves it.
         _require_role(principal, allowed={"approver"}, action="decide approvals")
         decided_by = _claim(principal, req.decided_by, field="decided_by")
+        _verify_decision_binding(
+            approval_id,
+            req.expected_contract_digest,
+            req.expected_impact_digest,
+        )
         try:
             return gateway.approve(
                 approval_id,
@@ -736,6 +770,11 @@ def create_app(
     ):
         _require_role(principal, allowed={"approver"}, action="approve and resume actions")
         decided_by = _claim(principal, req.decided_by, field="decided_by")
+        _verify_decision_binding(
+            approval_id,
+            req.expected_contract_digest,
+            req.expected_impact_digest,
+        )
         try:
             return gateway.approve_and_resume(
                 approval_id,
@@ -758,6 +797,11 @@ def create_app(
     ):
         _require_role(principal, allowed={"approver"}, action="decide approvals")
         decided_by = _claim(principal, req.decided_by, field="decided_by")
+        _verify_decision_binding(
+            approval_id,
+            req.expected_contract_digest,
+            req.expected_impact_digest,
+        )
         try:
             return gateway.deny_approval(approval_id, decided_by=decided_by, reason=req.reason)
         except KeyError as exc:
