@@ -41,6 +41,17 @@ inbound:
     evidence_state: specification only; not implemented
 
 outbound:
+  - to: owner-decision-surfaces
+    repository: tk-ap/ledgato
+    contract: contracts/impact-envelope.schema.json
+    trigger: a consequential approval has expected-impact context to present
+    evidence_state: specification only; not implemented
+  - to: owner-decision-surfaces
+    repository: tk-ap/ledgato
+    contract: contracts/decision-prompt-v2.schema.json
+    trigger: an impact-aware channel-neutral approval prompt is available
+    evidence_state: specification only; v1 remains implemented migration source
+
   - to: agent-os-workforce
     contract: contracts/outcome-event.schema.json
     trigger: a gate, probe, attestation, drift check, or enforcement evaluation produces verifiable evidence
