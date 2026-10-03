@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/mobile-approval-challenge.schema.json",
+  "title": "LEDGATo Mobile Approval Challenge",
+  "description": "Server-derived exact approval request fetched after authentication. The display representation is bound to the request digest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "approval_id",
+    "contract_digest",
+    "representation_version",
+    "challenge_nonce",
+    "requested_at",
+    "expires_at",
+    "state",
+    "operator_view",
+    "provenance"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.mobile-approval-challenge/v1"
+    },
+    "approval_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contract_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "representation_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "challenge_nonce": {
+      "type": "string",
+      "minLength": 16
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "state": {
+      "enum": [
+        "PENDING",
+        "APPROVED",
+        "DENIED",
+        "EXPIRED",
+        "REVOKED",
+        "SUPERSEDED"
+      ]
+    },
+    "operator_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor",
+        "action",
+        "resource",
+        "impact",
+        "why_held",
+        "consequence",
+        "facts"
+      ],
+      "properties": {
+        "actor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "why_held": {
+          "type": "string",
+          "minLength": 1
+        },
+        "consequence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "facts": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "value",
+              "redacted"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "redacted": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tool_identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema_fingerprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context_sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
