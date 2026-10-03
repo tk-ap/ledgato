@@ -12,7 +12,8 @@
     "authority_state",
     "execution_state",
     "verification_state",
-    "evidence_refs"
+    "evidence_refs",
+    "impact_verification"
   ],
   "properties": {
     "version": {
@@ -84,6 +85,43 @@
         "null"
       ],
       "format": "date-time"
+    },
+    "expected_impact_envelope_digest": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "impact_verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "summary"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "MATCHED",
+            "PARTIAL",
+            "DRIFTED",
+            "UNKNOWN",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     }
   }
 }
