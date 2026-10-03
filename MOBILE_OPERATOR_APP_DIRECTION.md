@@ -101,6 +101,34 @@ device-bound private key signs exact LEDGATo challenge
 LEDGATo verifies signature + device + attestation + nonce + expiry + scope
 ```
 
+## P0 request-integrity requirements
+
+Before the native approval path can be treated as production-grade, preserve three additional invariants documented in `STRATEGIC_ARCHITECTURE_DIRECTION_2026-10.md`.
+
+### What-you-see-is-what-you-sign
+
+The human-readable approval screen must be deterministically derived from the exact canonical request being signed.
+
+The approval evidence should bind:
+
+- the normalized request digest;
+- the rendering/representation version;
+- the consequential fields the operator was shown;
+- the device/approver identity;
+- the final decision.
+
+UI simplification may improve readability, but it must not permit the displayed consequence to diverge from the signed/executed request.
+
+### Tool/server/schema provenance
+
+Where relevant, bind the action to authenticated provider/server identity plus tool/capability identity and schema/protocol version or fingerprint. A familiar tool name must not silently preserve standing authority after its provider or semantics materially change.
+
+### Context-source provenance
+
+Where AgentOS supplies it, preserve the provenance of consequential parameters such as explicit owner instruction, typed standing authority, delegated agent input, retrieved content, email/message content, persisted context, or generated model output.
+
+Context provenance may cause policy to require more assurance. It must never silently grant authority.
+
 ## Approval record and lifecycle
 
 The backend should own a durable state machine such as:
@@ -242,6 +270,7 @@ Do not let these expand the first task:
 - Android parity before the iPhone proof is stable, unless implementation economics make a shared change trivial
 - sophisticated approval-learning UX
 - broad analytics
+- an embedded SSH/Mosh terminal or generalized remote-shell product
 
 ## Natural product expansion after proof
 
@@ -256,6 +285,60 @@ If the core loop is verified, the operator app may grow into:
 - **Emergency** — suspend/revoke an agent, workflow, credential path, or integration under separately authorized containment semantics
 
 The emergency surface is a natural extension of LEDGATo's containment/recovery model, not part of the initial approval proof.
+
+## Operator terminal / SSH / Moshi direction
+
+A remote operator session is a realistic follow-on capability, but it is **operator access**, not an approval transport and not a second execution runtime.
+
+Keep this distinction explicit:
+
+```text
+APPROVE
+  = sign the exact stored LEDGATo authority decision
+  = originating AgentOS workflow may resume
+
+OPEN TERMINAL
+  = open/resume a human-controlled shell session
+  = no approval is created by opening the shell
+  = no agent authority is expanded
+```
+
+### Preferred first integration
+
+Do not rebuild Moshi in the first LEDGATo mobile release.
+
+Use documented Moshi deep links for already-active Herdr/tmux sessions when a relevant session identity is available. This provides a low-friction **Open operator session** handoff while preserving the existing Tailscale + key-only SSH/Mosh + Moshi path.
+
+Do not depend on undocumented `moshi-hook` internals as a product contract.
+
+### When terminal access is appropriate
+
+Use operator terminal access for interventions that genuinely require the human, such as:
+
+- local/root-only actions intentionally unavailable to agents;
+- interactive authentication or 2FA;
+- OS trust dialogs;
+- credential/bootstrap work;
+- manual recovery;
+- live host/session inspection.
+
+If the human only needs to authorize an exact bounded terminal command for AgentOS to execute, prefer the normal signed approval flow. Show the exact command, host, cwd, privilege level and consequence, approve biometrically, then let AgentOS execute through its governed host path.
+
+### Future embedded terminal
+
+A first-party terminal inside LEDGATo is technically feasible but should be a later product decision.
+
+An embedded SSH implementation would require native networking/terminal code, host-key verification, device-keystore-backed SSH identity, private-network reachability and explicit operator-session semantics. Embedded Mosh adds UDP/native implementation and licensing concerns; upstream Mosh is GPLv3.
+
+Do not copy Blink, Moshi, or Mosh-derived code into LEDGATo without an explicit security and license review.
+
+If repeated use demonstrates that app-to-Moshi handoff is insufficient, evaluate a first-party SSH-only terminal before adding embedded Mosh.
+
+### AgentOS deferred host actions
+
+A future ecosystem integration may surface AgentOS owner-only/deferred actions as **Host Action** cards containing the host, workspace, reason human intervention is required, exact bounded command/interaction, privilege indicator, verification expectation and linked workflow.
+
+AgentOS remains canonical for that deferred work item. LEDGATo remains canonical only for authority decisions it owns. Completion must come from runtime/provider evidence, not a user merely tapping "done."
 
 ## AgentOS implementation gate
 
