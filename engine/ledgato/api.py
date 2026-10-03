@@ -21,7 +21,10 @@ from .adapters.github import GitHubAdapter
 from .adapters.host import HostActionAdapter
 from .adapters.x402 import X402Adapter
 from .approvals import ApprovalStore
-from .decision_prompt import (\n    from_approval as decision_prompt_from_approval,\n    from_approval_v2 as decision_prompt_v2_from_approval,\n)
+from .decision_prompt import (
+    from_approval as decision_prompt_from_approval,
+    from_approval_v2 as decision_prompt_v2_from_approval,
+)
 from .principals import (
     IdentityClaimError,
     Principal,
@@ -175,7 +178,9 @@ class GatewayRequest(BaseModel):
     attack_surface: Optional[list[str]] = None
     # Execution metadata only; grants nothing.
     executor_provider: Optional[str] = None
-    # Advisory impact facts only; grants no authority.\n    impact_context: Optional[dict[str, Any]] = None\n
+    # Advisory impact facts only; grants no authority.
+    impact_context: Optional[dict[str, Any]] = None
+
 
 class CampaignRegisterRequest(BaseModel):
     principal_id: str
@@ -684,7 +689,8 @@ def create_app(
         _require_role(principal, allowed={"approver", "admin"}, action="read decision prompts")
         return {
             "prompts": [
-                _decision_prompt(item, version)\n                for item in approvals.list(status=status)
+                _decision_prompt(item, version)
+                for item in approvals.list(status=status)
             ]
         }
 
