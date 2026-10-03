@@ -267,6 +267,26 @@ The app may improve layout or wording, but it may not fabricate a different scop
 
 If the server says the request changed, expired, was revoked, was superseded, or is otherwise stale, the client must refetch/re-render before a new decision.
 
+## 9A. Impact-aware approval plane
+
+The Impact Envelope is canonical approval-plane context, not a mobile-owned feature.
+
+Read `IMPACT_ENVELOPE.md`.
+
+For the first mobile proof, the app only renders the server-derived minimal impact preview and binds its digest into the signed decision. It does not compute blast radius itself.
+
+First-slice minimum impact preview:
+
+- direct change class where known;
+- create/modify/replace/delete facts where deterministic evidence exists;
+- reversibility or `UNKNOWN`;
+- novelty or `UNKNOWN`;
+- directly known AgentOS task/work relationship;
+- explicit `KNOWN / INFERRED / UNKNOWN` confidence;
+- Impact Envelope digest.
+
+Richer dependency/workstream graphs are post-proof expansion and must not delay the initial mobile E2E path.
+
 ## 10. Tool/server/schema and context provenance
 
 For consequential actions, preserve relevant provenance supplied by the backend:

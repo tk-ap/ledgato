@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/impact-envelope.schema.json",
+  "title": "LEDGATo Impact Envelope",
+  "description": "Advisory impact context for one exact consequential action. It informs approval but never grants authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "action_contract_digest",
+    "generated_at",
+    "resolution_state",
+    "direct_changes",
+    "related_impacts",
+    "reversibility",
+    "novelty"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.impact-envelope/v1"
+    },
+    "action_contract_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolution_state": {
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "UNAVAILABLE"
+      ]
+    },
+    "direct_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "subject",
+          "summary",
+          "confidence"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "CREATE",
+              "MODIFY",
+              "REPLACE",
+              "DELETE",
+              "MOVE",
+              "GRANT",
+              "REVOKE",
+              "RESTART",
+              "MIGRATE",
+              "EXECUTE",
+              "OTHER"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "confidence": {
+            "enum": [
+              "KNOWN",
+              "INFERRED",
+              "UNKNOWN"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "related_impacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "category",
+          "subject",
+          "effect",
+          "extent",
+          "confidence"
+        ],
+        "properties": {
+          "category": {
+            "enum": [
+              "DEPENDENCY",
+              "WORKSTREAM",
+              "AUTHORITY",
+              "RUNTIME",
+              "DATA",
+              "USER",
+              "SECURITY",
+              "OTHER"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "effect": {
+            "type": "string",
+            "minLength": 1
+          },
+          "extent": {
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "UNKNOWN"
+            ]
+          },
+          "confidence": {
+            "enum": [
+              "KNOWN",
+              "INFERRED",
+              "UNKNOWN"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "reversibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "summary",
+        "confidence"
+      ],
+      "properties": {
+        "class": {
+          "enum": [
+            "REVERSIBLE",
+            "PARTIALLY_REVERSIBLE",
+            "IRREVERSIBLE",
+            "UNKNOWN"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "enum": [
+            "KNOWN",
+            "INFERRED",
+            "UNKNOWN"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "novelty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "summary",
+        "confidence"
+      ],
+      "properties": {
+        "class": {
+          "enum": [
+            "KNOWN_REPEATED",
+            "KNOWN_CHANGED",
+            "NEW",
+            "UNKNOWN"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "enum": [
+            "KNOWN",
+            "INFERRED",
+            "UNKNOWN"
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

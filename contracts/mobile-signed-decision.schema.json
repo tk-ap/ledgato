@@ -10,6 +10,7 @@
     "approval_id",
     "contract_digest",
     "representation_version",
+    "impact_envelope_digest",
     "challenge_nonce",
     "decision",
     "device_id",
@@ -58,6 +59,10 @@
     "signature": {
       "type": "string",
       "minLength": 1
+    },
+    "impact_envelope_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     }
   }
 }

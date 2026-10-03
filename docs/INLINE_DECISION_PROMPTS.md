@@ -13,6 +13,32 @@ clients render that same object.
 
 The **approval remains the authority object**. The prompt is presentation only.
 
+## Impact-aware approval-plane direction
+
+The canonical approval plane is evolving to include the Impact Envelope defined in `IMPACT_ENVELOPE.md`.
+
+This applies to **all** approval surfaces: web, Telegram, TUI, chat, mobile, and future clients.
+
+Current implementation remains `ledgato.decision-prompt/v1`. Do not claim impact-aware approval is implemented merely because the v2 schema exists.
+
+Migration target:
+
+- `contracts/impact-envelope.schema.json` — advisory expected-impact context for the exact action;
+- `contracts/decision-prompt-v2.schema.json` — channel-neutral prompt that binds the action digest and Impact Envelope digest.
+
+V2 adds:
+
+- direct create/modify/replace/delete/etc. classification;
+- related dependency/workstream/authority/runtime/data/user/security impact;
+- reversibility;
+- novelty;
+- explicit `KNOWN / INFERRED / UNKNOWN` confidence;
+- an impact digest bound to the approval presentation.
+
+A transport must not independently regenerate or reinterpret impact analysis. It renders the server-derived v2 semantics.
+
+During migration, v1 and v2 may coexist. A boundary configured to require v2 must not silently downgrade to v1 because one transport has not upgraded.
+
 ## Default choices
 
 - **Allow once** — approve and resume the exact stored action once. No standing

@@ -1,80 +1,78 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ledgato.dev/contracts/mobile-approval-challenge.schema.json",
-  "title": "LEDGATo Mobile Approval Challenge",
-  "description": "Server-derived exact approval request fetched after authentication. The display representation is bound to the request digest.",
+  "$id": "https://ledgato.dev/contracts/decision-prompt-v2.schema.json",
+  "title": "LEDGATo Decision Prompt v2",
+  "description": "Channel-neutral approval prompt with exact-action and impact-envelope binding. Specification target; v1 remains implemented during migration.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "version",
-    "approval_id",
+    "decision_id",
     "contract_digest",
-    "representation_version",
-    "challenge_nonce",
-    "requested_at",
-    "expires_at",
-    "state",
-    "operator_view",
-    "provenance",
+    "parameters_digest",
     "impact_envelope_digest",
-    "impact_preview"
+    "impact_resolution_state",
+    "agent",
+    "requested_at",
+    "boundary",
+    "requested_action",
+    "impact_preview",
+    "why_held",
+    "consequence",
+    "state",
+    "choices"
   ],
   "properties": {
     "version": {
-      "const": "ledgato.mobile-approval-challenge/v1"
+      "const": "ledgato.decision-prompt/v2"
     },
-    "approval_id": {
+    "decision_id": {
       "type": "string",
-      "minLength": 1
+      "pattern": "^approval_[A-Za-z0-9_-]+$"
     },
     "contract_digest": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
-    "representation_version": {
+    "parameters_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "impact_envelope_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "impact_resolution_state": {
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "UNAVAILABLE"
+      ]
+    },
+    "agent": {
       "type": "string",
       "minLength": 1
     },
-    "challenge_nonce": {
-      "type": "string",
-      "minLength": 16
+    "task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "requested_at": {
       "type": "string",
       "format": "date-time"
     },
-    "expires_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "state": {
-      "enum": [
-        "PENDING",
-        "APPROVED",
-        "DENIED",
-        "EXPIRED",
-        "REVOKED",
-        "SUPERSEDED"
-      ]
-    },
-    "operator_view": {
+    "boundary": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "actor",
-        "action",
+        "adapter",
         "resource",
-        "impact",
-        "why_held",
-        "consequence",
-        "facts"
+        "protected_action"
       ],
       "properties": {
-        "actor": {
-          "type": "string",
-          "minLength": 1
-        },
-        "action": {
+        "adapter": {
           "type": "string",
           "minLength": 1
         },
@@ -82,23 +80,39 @@
           "type": "string",
           "minLength": 1
         },
-        "environment": {
-          "type": [
-            "string",
-            "null"
-          ]
+        "protected_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "requested_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "resource",
+        "impact",
+        "facts"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
         },
         "impact": {
           "type": "string",
           "minLength": 1
         },
-        "why_held": {
-          "type": "string",
-          "minLength": 1
-        },
-        "consequence": {
-          "type": "string",
-          "minLength": 1
+        "intent": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "facts": {
           "type": "array",
@@ -126,45 +140,10 @@
         }
       }
     },
-    "provenance": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "server_identity": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tool_identity": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "schema_fingerprint": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "context_sources": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "impact_envelope_digest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
     "impact_preview": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "resolution_state",
         "direct_changes",
         "related_impacts",
         "reversibility",
@@ -172,15 +151,9 @@
         "unknowns"
       ],
       "properties": {
-        "resolution_state": {
-          "enum": [
-            "COMPLETE",
-            "PARTIAL",
-            "UNAVAILABLE"
-          ]
-        },
         "direct_changes": {
           "type": "array",
+          "maxItems": 8,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -208,6 +181,7 @@
         },
         "related_impacts": {
           "type": "array",
+          "maxItems": 8,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -307,6 +281,53 @@
         "unknowns": {
           "type": "array",
           "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "why_held": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consequence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "choices": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "effect"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "allow_once",
+              "deny",
+              "inspect"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "decision",
+              "information"
+            ]
+          },
+          "effect": {
             "type": "string"
           }
         }

@@ -107,6 +107,25 @@ device-bound private key signs exact LEDGATo challenge
 LEDGATo verifies signature + device + attestation + nonce + expiry + scope
 ```
 
+## Impact Preview
+
+The mobile app does not own impact analysis. It renders the canonical approval-plane Impact Envelope defined in `IMPACT_ENVELOPE.md`.
+
+A consequential approval should tell the operator, in plain language:
+
+- what is new;
+- what is modified or overwritten/replaced;
+- what is deleted;
+- what related dependencies/workstreams may be affected;
+- expected runtime/authority/data/user/security consequences;
+- reversibility;
+- novelty;
+- known vs inferred vs unknown impact.
+
+The signed mobile decision should bind the Impact Envelope digest that was presented.
+
+The first mobile proof may use only the minimal direct-change/novelty/reversibility slice. Full dependency graph/workstream blast-radius intelligence is a later expansion.
+
 ## P0 request-integrity requirements
 
 Before the native approval path can be treated as production-grade, preserve three additional invariants documented in `STRATEGIC_ARCHITECTURE_DIRECTION_2026-10.md`.
