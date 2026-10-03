@@ -101,7 +101,7 @@ def _fallback_direct(approval: "Approval") -> list[dict[str, Any]]:
     resource = _text(action.get("domain") or "unspecified")
     kind = {
         "readonly": "OTHER",
-        "write": "MODIFY",
+        "write": "OTHER",
         "exec": "EXECUTE",
         "destructive": "OTHER",
     }.get(impact, "OTHER")
