@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/mobile-push-envelope.schema.json",
+  "title": "LEDGATo Mobile Push Envelope",
+  "description": "Minimal non-authoritative notification envelope. Possession or interaction never grants authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "event",
+    "approval_id"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.mobile-push/v1"
+    },
+    "event": {
+      "enum": [
+        "approval_pending",
+        "approval_updated"
+      ]
+    },
+    "approval_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "display_hint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 120,
+      "description": "Optional non-sensitive text only. Never include credentials, commands, protected parameters, permit tokens, or decision authority."
+    }
+  }
+}
