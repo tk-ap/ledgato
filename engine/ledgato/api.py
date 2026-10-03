@@ -673,8 +673,10 @@ def create_app(
     def _decision_prompt(item, version: str):
         if version == "v2":
             return decision_prompt_v2_from_approval(item).to_dict()
-        return _decision_prompt(item, version)
-\n    @app.get("/v1/decision-prompts")\n    def list_decision_prompts(
+        return decision_prompt_from_approval(item).to_dict()
+
+    @app.get("/v1/decision-prompts")
+    def list_decision_prompts(
         status: str | None = "PENDING",
         version: Literal["v1", "v2"] = "v1",
         principal: Principal = Depends(_principal),
@@ -696,7 +698,7 @@ def create_app(
         item = approvals.get(approval_id)
         if not item:
             raise HTTPException(404, f"unknown approval '{approval_id}'")
-        return decision_prompt_from_approval(item).to_dict()
+        return _decision_prompt(item, version)
 
     @app.post("/v1/approvals/{approval_id}/approve")
     def approve(
