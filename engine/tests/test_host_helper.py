@@ -96,6 +96,9 @@ def test_activation_installs_only_fixed_units_and_fixed_systemd_actions(monkeypa
     assert "agentos-runtime-checkout.timer" in joined
     assert "agentos-board-projection.timer" in joined
     assert "agentos-board-projection.service" in joined
+    assert "agentos-youtube-ingestion.timer" in joined
+    assert "agentos-youtube-ingestion.service" in joined
+    assert "/var/lib/agent-os/youtube-ingestion" in joined
     assert "ssh" not in joined
     assert "tailscale" not in joined
 
