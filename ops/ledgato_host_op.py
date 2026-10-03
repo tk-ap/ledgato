@@ -45,6 +45,14 @@ UNIT_FILES = (
         "runtime/systemd/agentos-board-projection.service.d/20-workspace-board-publisher.conf",
         "/etc/systemd/system/agentos-board-projection.service.d/20-workspace-board-publisher.conf",
     ),
+    (
+        "runtime/systemd/agentos-youtube-ingestion.service",
+        "/etc/systemd/system/agentos-youtube-ingestion.service",
+    ),
+    (
+        "runtime/systemd/agentos-youtube-ingestion.timer",
+        "/etc/systemd/system/agentos-youtube-ingestion.timer",
+    ),
 )
 
 RUNTIME_EXECUTABLES = (
@@ -60,11 +68,14 @@ VERIFY_UNITS = (
     "runtime/systemd/agentos-board-projection.service",
     "runtime/systemd/agentos-board-projection.timer",
     "runtime/systemd/agentos-workspace-board-publisher.service",
+    "runtime/systemd/agentos-youtube-ingestion.service",
+    "runtime/systemd/agentos-youtube-ingestion.timer",
 )
 
 ENABLED_TIMERS = (
     "agentos-runtime-checkout.timer",
     "agentos-board-projection.timer",
+    "agentos-youtube-ingestion.timer",
 )
 
 OPERATIONS = {"agentos-runtime-activate", "agentos-runtime-status"}
@@ -358,9 +369,22 @@ def _activate() -> dict[str, Any]:
         check=False,
     )
 
-    # Provision/update the account-owned runtime before any board service uses it.
+    # Provision/update the account-owned runtime before any runtime service uses it.
     _run(["/usr/bin/systemctl", "start", "agentos-runtime-checkout.service"])
+
+    # The ingestion service writes only to this fixed runtime-owned state path.
+    # Create it here rather than granting the service write access to a broader
+    # /var/lib parent.
+    _run([
+        "/usr/bin/install", "-d", "-o", "agentos", "-g", "agentos", "-m", "0750",
+        "/var/lib/agent-os/youtube-ingestion",
+    ])
+
     _run(["/usr/bin/systemctl", "enable", "--now", *ENABLED_TIMERS])
+
+    # Force one bounded ingestion pass now. A missing transcript is represented
+    # by the worker as NEEDS_REVIEW; transport/acquisition failures fail closed.
+    _run(["/usr/bin/systemctl", "start", "agentos-youtube-ingestion.service"])
 
     # Force one bounded projection now; its OnSuccess hook publishes the matching
     # snapshot through the existing publisher service.
