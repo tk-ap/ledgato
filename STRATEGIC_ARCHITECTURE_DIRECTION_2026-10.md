@@ -308,6 +308,28 @@ Signed agent intent in commerce protocols reinforces a useful architectural dist
 
 Protocol-native signed intent should therefore become evidence/input to the canonical LEDGATo decision envelope, not a bypass around the decision layer.
 
+## Impact-aware approval plane
+
+The canonical human-approval model includes the [`Impact Envelope`](./IMPACT_ENVELOPE.md).
+
+This is not a mobile-only concern.
+
+Every approval surface should eventually answer:
+
+- what directly changes;
+- what is added, modified, replaced, deleted, granted, revoked, restarted, migrated, or executed;
+- what dependencies and active workstreams may be affected;
+- what authority/runtime/data/user/security consequences exist;
+- how reversible the action is;
+- whether the action/path is materially new;
+- which claims are known vs inferred vs unknown.
+
+The operator decision should bind the exact action and the Impact Envelope that was shown.
+
+After execution, LEDGATo should compare expected vs actual impact using provider/runtime evidence. This extends the assurance loop from "did it execute?" to "did reality change in the way the operator was told it would?"
+
+Impact context may influence deterministic policy, but it is not itself executable authority.
+
 ## Native operator app relationship
 
 Canonical mobile details live in `MOBILE_OPERATOR_APP_DIRECTION.md`.
