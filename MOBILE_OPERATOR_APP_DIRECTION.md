@@ -52,6 +52,12 @@ Consequences:
 - An approval is valid only for the exact stored action it was created for.
 - AgentOS must resume from the verified LEDGATo decision, not from a local app event or push receipt.
 
+## Implementation contract
+
+When the implementation gate is eventually satisfied, the first native build must follow `MOBILE_BUILD_CONTRACT.md` and the machine-readable `.agent-os/mobile-build-readiness.yaml`.
+
+Those files intentionally remove implementation degrees of freedom that this product-direction document leaves open. A mobile builder must not infer readiness, select a new identity provider, invent parallel backend authority, expand the first-user scope, or replace the versioned mobile contracts without an explicit reviewed change.
+
 ## Recommended implementation stack
 
 ### Mobile client
