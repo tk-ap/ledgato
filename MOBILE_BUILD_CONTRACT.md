@@ -123,6 +123,7 @@ contracts/
   mobile-signed-decision.schema.json
   mobile-approval-receipt.schema.json
   mobile-push-envelope.schema.json
+  mobile-push-registration.schema.json
 ```
 
 If the repository's current package manager/workspace structure makes an equivalent placement materially cleaner, preserve the same ownership boundaries rather than forcing these exact directory names. Do not rewrite the existing web application or Python engine to obtain monorepo aesthetic consistency.
@@ -494,7 +495,7 @@ Manual operator evidence must be labeled distinctly from agent-executed LEDGATo-
 
 Useful evidence vocabulary:
 
-- `AGENT_EXECUTED_LED GATO_GOVERNED` equivalent machine value using valid identifier syntax;
+- `AGENT_EXECUTED_LEDGATO_GOVERNED`;
 - `HUMAN_EXECUTED_OPERATOR_SESSION`.
 
 Choose final enum spelling in the versioned evidence contract; do not conflate the two semantics.
