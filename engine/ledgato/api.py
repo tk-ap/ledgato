@@ -21,7 +21,10 @@ from .adapters.github import GitHubAdapter
 from .adapters.host import HostActionAdapter
 from .adapters.x402 import X402Adapter
 from .approvals import ApprovalStore
-from .decision_prompt import from_approval as decision_prompt_from_approval
+from .decision_prompt import (
+    from_approval as decision_prompt_from_approval,
+    from_approval_v2 as decision_prompt_v2_from_approval,
+)
 from .principals import (
     IdentityClaimError,
     Principal,
@@ -175,6 +178,8 @@ class GatewayRequest(BaseModel):
     attack_surface: Optional[list[str]] = None
     # Execution metadata only; grants nothing.
     executor_provider: Optional[str] = None
+    # Advisory impact facts only; grants no authority.
+    impact_context: Optional[dict[str, Any]] = None
 
 
 class CampaignRegisterRequest(BaseModel):
@@ -210,11 +215,15 @@ class ApprovalDecisionRequest(BaseModel):
     decided_by: Optional[str] = None
     reason: Optional[str] = None
     jit_ttl_seconds: Optional[int] = 300
+    expected_contract_digest: Optional[str] = None
+    expected_impact_digest: Optional[str] = None
 
 
 class ApprovalDenyRequest(BaseModel):
     decided_by: Optional[str] = None
     reason: Optional[str] = None
+    expected_contract_digest: Optional[str] = None
+    expected_impact_digest: Optional[str] = None
 
 
 class ResumeRequest(BaseModel):
@@ -585,6 +594,7 @@ def create_app(
                 requested_by=principal.id,
                 idempotency_key=req.idempotency_key,
                 campaign_context=campaign_context,
+                impact_context=req.impact_context,
             )
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -668,15 +678,47 @@ def create_app(
     def list_approvals(status: str | None = None):
         return {"approvals": [a.to_dict() for a in approvals.list(status=status)]}
 
+
+    def _decision_prompt(item, version: str):
+        if version == "v2":
+            return decision_prompt_v2_from_approval(item).to_dict()
+        return decision_prompt_from_approval(item).to_dict()
+
+    def _verify_decision_binding(
+        approval_id: str,
+        expected_contract_digest: str | None,
+        expected_impact_digest: str | None,
+    ) -> None:
+        if not expected_contract_digest and not expected_impact_digest:
+            return
+        item = approvals.get(approval_id)
+        if not item:
+            raise HTTPException(404, f"unknown approval '{approval_id}'")
+        current_v1 = decision_prompt_from_approval(item)
+        if (
+            expected_contract_digest
+            and current_v1.contract_digest != expected_contract_digest
+        ):
+            raise HTTPException(
+                409, "the protected action changed since this prompt was rendered"
+            )
+        if expected_impact_digest:
+            current_v2 = decision_prompt_v2_from_approval(item)
+            if current_v2.impact_envelope_digest != expected_impact_digest:
+                raise HTTPException(
+                    409, "the expected impact changed since this prompt was rendered"
+                )
+
     @app.get("/v1/decision-prompts")
     def list_decision_prompts(
         status: str | None = "PENDING",
+        version: Literal["v1", "v2"] = "v1",
         principal: Principal = Depends(_principal),
     ):
         _require_role(principal, allowed={"approver", "admin"}, action="read decision prompts")
         return {
             "prompts": [
-                decision_prompt_from_approval(item).to_dict()
+                _decision_prompt(item, version)
                 for item in approvals.list(status=status)
             ]
         }
@@ -684,13 +726,14 @@ def create_app(
     @app.get("/v1/decision-prompts/{approval_id}")
     def get_decision_prompt(
         approval_id: str,
+        version: Literal["v1", "v2"] = "v1",
         principal: Principal = Depends(_principal),
     ):
         _require_role(principal, allowed={"approver", "admin"}, action="read decision prompts")
         item = approvals.get(approval_id)
         if not item:
             raise HTTPException(404, f"unknown approval '{approval_id}'")
-        return decision_prompt_from_approval(item).to_dict()
+        return _decision_prompt(item, version)
 
     @app.post("/v1/approvals/{approval_id}/approve")
     def approve(
@@ -702,6 +745,11 @@ def create_app(
         # be the principal that approves it.
         _require_role(principal, allowed={"approver"}, action="decide approvals")
         decided_by = _claim(principal, req.decided_by, field="decided_by")
+        _verify_decision_binding(
+            approval_id,
+            req.expected_contract_digest,
+            req.expected_impact_digest,
+        )
         try:
             return gateway.approve(
                 approval_id,
@@ -722,6 +770,11 @@ def create_app(
     ):
         _require_role(principal, allowed={"approver"}, action="approve and resume actions")
         decided_by = _claim(principal, req.decided_by, field="decided_by")
+        _verify_decision_binding(
+            approval_id,
+            req.expected_contract_digest,
+            req.expected_impact_digest,
+        )
         try:
             return gateway.approve_and_resume(
                 approval_id,
@@ -744,6 +797,11 @@ def create_app(
     ):
         _require_role(principal, allowed={"approver"}, action="decide approvals")
         decided_by = _claim(principal, req.decided_by, field="decided_by")
+        _verify_decision_binding(
+            approval_id,
+            req.expected_contract_digest,
+            req.expected_impact_digest,
+        )
         try:
             return gateway.deny_approval(approval_id, decided_by=decided_by, reason=req.reason)
         except KeyError as exc:

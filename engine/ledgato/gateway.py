@@ -71,6 +71,7 @@ class EnforcementGateway:
         requested_by: str | None = None,
         idempotency_key: str | None = None,
         campaign_context: dict[str, Any] | None = None,
+        impact_context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         # Validate all deterministic local prerequisites before reserving the
         # operation key. Configuration mistakes must not poison a key as an
@@ -92,6 +93,7 @@ class EnforcementGateway:
             "grant_id": grant_id,
             "requested_by": requested_by,
             "campaign_context": campaign_context,
+            "impact_context": impact_context,
         }
         if idempotency_key:
             cached = self.idempotency.begin(idempotency_key, request_record)
@@ -107,6 +109,7 @@ class EnforcementGateway:
             "requested_by": requested_by,
             "idempotency_key": idempotency_key,
             "campaign": campaign_context,
+            "impact_context": impact_context,
         }
 
         if decision.outcome == DENY:
@@ -128,7 +131,10 @@ class EnforcementGateway:
                 grant_id=grant_id,
                 requested_by=requested_by,
                 campaign_context=campaign_context,
-                decision_context=decision.to_dict(),
+                decision_context={
+                    **decision.to_dict(),
+                    **({"impact_context": impact_context} if impact_context else {}),
+                },
             )
             evidence = {
                 **base_evidence,
