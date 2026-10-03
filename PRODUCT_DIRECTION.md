@@ -328,6 +328,21 @@ The product should be understandable as:
 
 The website should communicate that the value happens while the user is **not** in Ledgato. The product is not "another AI dashboard"; the dashboard exists so the human can understand and control an otherwise autonomous enforcement system.
 
+## Current strategic architecture reference
+
+The current proof state, production convergence target, sector/protocol implications, request-integrity requirements, and operator-terminal direction are recorded in [`STRATEGIC_ARCHITECTURE_DIRECTION_2026-10.md`](./STRATEGIC_ARCHITECTURE_DIRECTION_2026-10.md).
+
+That document is the planning reference for the next post-proof implementation phase. It does not increase the evidence level of any unimplemented capability.
+
+Key additions to the product direction are:
+
+- converge the independently verified live-provider path with the signed single-use permit path;
+- preserve **what-you-see-is-what-you-sign** for mobile approvals;
+- bind consequential actions to tool/server/schema provenance where material;
+- preserve consequential context-source provenance without allowing context to become authority;
+- consume emerging MCP/A2A/runtime-control/workload-identity standards as interoperability layers rather than competing with them;
+- support an optional operator-terminal handoff while keeping remote shell access distinct from authorization and from AgentOS execution.
+
 ## Native operator app: first-party human authority surface
 
 The approved mobile direction is a native iOS/Android **LEDGATo operator app**. The detailed architecture, security invariants, implementation stack, AgentOS build gate, and first vertical slice are canonicalized in [`MOBILE_OPERATOR_APP_DIRECTION.md`](./MOBILE_OPERATOR_APP_DIRECTION.md).
