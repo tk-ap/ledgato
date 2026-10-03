@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgato.dev/contracts/decision-prompt-v2.schema.json",
+  "title": "LEDGATo Decision Prompt v2",
+  "description": "Channel-neutral approval prompt with exact-action and impact-envelope binding. Specification target; v1 remains implemented during migration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "decision_id",
+    "contract_digest",
+    "parameters_digest",
+    "impact_envelope_digest",
+    "impact_resolution_state",
+    "agent",
+    "requested_at",
+    "boundary",
+    "requested_action",
+    "impact_preview",
+    "why_held",
+    "consequence",
+    "state",
+    "choices"
+  ],
+  "properties": {
+    "version": {
+      "const": "ledgato.decision-prompt/v2"
+    },
+    "decision_id": {
+      "type": "string",
+      "pattern": "^approval_[A-Za-z0-9_-]+$"
+    },
+    "contract_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "parameters_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "impact_envelope_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "impact_resolution_state": {
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "UNAVAILABLE"
+      ]
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter",
+        "resource",
+        "protected_action"
+      ],
+      "properties": {
+        "adapter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protected_action": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "requested_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "resource",
+        "impact",
+        "facts"
+      ],
+      "properties": {
+        "tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resource": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "facts": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "value",
+              "redacted"
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              },
+              "redacted": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "impact_preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direct_changes",
+        "related_impacts",
+        "reversibility",
+        "novelty",
+        "unknowns"
+      ],
+      "properties": {
+        "direct_changes": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "summary",
+              "confidence"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "confidence": {
+                "enum": [
+                  "KNOWN",
+                  "INFERRED",
+                  "UNKNOWN"
+                ]
+              }
+            }
+          }
+        },
+        "related_impacts": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "category",
+              "subject",
+              "effect",
+              "extent",
+              "confidence"
+            ],
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "effect": {
+                "type": "string"
+              },
+              "extent": {
+                "enum": [
+                  "LOW",
+                  "MEDIUM",
+                  "HIGH",
+                  "UNKNOWN"
+                ]
+              },
+              "confidence": {
+                "enum": [
+                  "KNOWN",
+                  "INFERRED",
+                  "UNKNOWN"
+                ]
+              }
+            }
+          }
+        },
+        "reversibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "class",
+            "summary",
+            "confidence"
+          ],
+          "properties": {
+            "class": {
+              "enum": [
+                "REVERSIBLE",
+                "PARTIALLY_REVERSIBLE",
+                "IRREVERSIBLE",
+                "UNKNOWN"
+              ]
+            },
+            "summary": {
+              "type": "string"
+            },
+            "confidence": {
+              "enum": [
+                "KNOWN",
+                "INFERRED",
+                "UNKNOWN"
+              ]
+            }
+          }
+        },
+        "novelty": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "class",
+            "summary",
+            "confidence"
+          ],
+          "properties": {
+            "class": {
+              "enum": [
+                "KNOWN_REPEATED",
+                "KNOWN_CHANGED",
+                "NEW",
+                "UNKNOWN"
+              ]
+            },
+            "summary": {
+              "type": "string"
+            },
+            "confidence": {
+              "enum": [
+                "KNOWN",
+                "INFERRED",
+                "UNKNOWN"
+              ]
+            }
+          }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "why_held": {
+      "type": "string",
+      "minLength": 1
+    },
+    "consequence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1
+    },
+    "choices": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "effect"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "allow_once",
+              "deny",
+              "inspect"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "decision",
+              "information"
+            ]
+          },
+          "effect": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
