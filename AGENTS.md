@@ -16,6 +16,31 @@ LEDGATo is not the generic workforce router and should not absorb every sensitiv
 
 Do not redefine those roles locally.
 
+## Boundary Proof Claim Guardrail
+
+Before making, changing, or implementing a claim about what Ledgato can enforce,
+read:
+
+- `.agent-os/boundary-proof-registry.yaml`
+- `BOUNDARY_PROOF_PORTFOLIO.md`
+
+The registry is the evidence ceiling for a boundary.
+
+Preserve these rules:
+
+- implemented is not the same as proven;
+- a passing unit suite is not a live-provider proof;
+- a successful DENY does not establish non-bypassability without alternate-route evidence;
+- a new adapter does not inherit the GitHub boundary's evidence grade;
+- do not upgrade a boundary grade from prose, issue state, or implementation-agent self-assessment;
+- the strongest lab/provider grade requires independent verification;
+- external-customer proof requires evidence outside the founder environment;
+- website/UI/demo/sales language must not exceed the boundary's `claim_scope`;
+- every new case study should use the shared proof grammar and attack matrix in `BOUNDARY_PROOF_PORTFOLIO.md`.
+
+When work materially changes a boundary's evidence, update the registry in the
+same reviewed change or leave the existing lower grade intact.
+
 ## Evidence Truth
 
 The repository contains an engine and public product claims, but agents must preserve execution-state distinctions:
