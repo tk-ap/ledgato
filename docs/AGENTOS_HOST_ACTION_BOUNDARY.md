@@ -209,3 +209,24 @@ fresh canonical task
 -> reboot
 -> recovery without duplicate execution or manual reconstruction
 ```
+
+## Owner session grants
+
+TK decided on 2026-10-04 that one approval per working session should cover
+that session's merges and runtime installs, instead of one tap per action
+(`tk-ap/agent-os` `docs/decisions/OWNER_INITIATED_AUTHORITY.md`).
+
+- The session is itself a protected action, `ledgato.session.grant`, on the
+  `session` adapter. Policy always holds it for owner approval.
+- On Allow once, `adapters/session.py` issues an `AuthorityGrant` with
+  `satisfies_approval=True` and `granted_by=owner-session:<approver>`.
+- A later request carrying that `grant_id` skips the owner card only when the
+  grant is active and the action is inside the grant's own tools, domains and
+  impact. Out of scope or expired is DENY; a request with no grant still gets
+  the normal card.
+- Limits enforced by the adapter: issued only from an owner approval; tools
+  listed explicitly from a fixed grantable set (`host.agentos.runtime.activate`,
+  `github.pull.merge`), never `ledgato.session.grant` itself; data domains
+  listed explicitly; impact at most `write`; lifetime at most 4 hours.
+- Ordinary grants (including the admin `/v1/authority/grants` API, which does
+  not accept the flag) never stand in for approval.

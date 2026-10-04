@@ -63,6 +63,10 @@ class AuthorityGrant:
     revoked_at: Optional[str] = None
     revoked_by: Optional[str] = None
     revocation_reason: Optional[str] = None
+    #: True only for grants issued by an owner's approval of a session
+    #: (adapters/session.py). Such a grant stands in for per-action owner
+    #: approval, within its own tools, domains, impact and lifetime.
+    satisfies_approval: bool = False
 
     def active(self, now: datetime | None = None) -> bool:
         now = now or utcnow()

@@ -118,6 +118,11 @@ def evaluate_action(
         action.tool in policy.approval_tools
         or (approval_min is not None and action.severity() >= approval_min)
     )
+    if approval_needed and not approval_satisfied and grant is not None and grant.satisfies_approval:
+        # Only reachable after _check_grant above passed: the owner-approved
+        # session grant covers this exact tool, domain, impact and is active.
+        approval_satisfied = True
+        reasons.append(f"owner session grant '{grant.id}' satisfies approval")
     if approval_needed and not approval_satisfied:
         reasons.append("policy requires approval for this consequential crossing")
         return _decision(APPROVE, "APPROVE: human or higher-order approval required", reasons, policy, grant)

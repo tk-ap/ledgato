@@ -341,6 +341,7 @@ class EnforcementGateway:
             requested_by=consumed.requested_by,
             approval_id=consumed.id,
             campaign_context=consumed.campaign_context,
+            approved_by=consumed.decided_by,
         )
 
     def _decide(
@@ -473,8 +474,16 @@ class EnforcementGateway:
         requested_by: str | None,
         approval_id: str | None,
         campaign_context: dict[str, Any] | None = None,
+        approved_by: str | None = None,
     ) -> dict[str, Any]:
-        receipt: ExecutionReceipt = target.execute(action)
+        execute_with_context = getattr(target, "execute_with_context", None)
+        if callable(execute_with_context):
+            # Adapters whose effect depends on who approved (session grants)
+            # get that context; approved_by is set only on the resume path.
+            receipt: ExecutionReceipt = execute_with_context(
+                action, agent=agent, approved_by=approved_by, approval_id=approval_id)
+        else:
+            receipt = target.execute(action)
         verification = target.verify(action, receipt)
         receipt.verification = verification
         evidence = {

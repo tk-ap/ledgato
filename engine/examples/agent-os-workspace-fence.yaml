@@ -14,8 +14,12 @@ policies:
       - agentos.dispatch
       - host.agentos.runtime.status
       - host.agentos.runtime.activate
+      - ledgato.session.grant
     approve_tool:
       - host.agentos.runtime.activate
+      # A session grant is always the owner's call; once approved it stands in
+      # for per-action approval inside its own scope (adapters/session.py).
+      - ledgato.session.grant
     impact_max: write
     data_domains:
       - workspace-command::*
@@ -23,6 +27,7 @@ policies:
       - hermes-command::*
       - autonomous-backlog::*
       - ashwood-host-01
+      - ledgato-session::*
     on_deny:
       - alert
       - human_review
