@@ -96,6 +96,8 @@ def test_activation_installs_only_fixed_units_and_fixed_systemd_actions(monkeypa
     assert "agentos-runtime-checkout.timer" in joined
     assert "agentos-board-projection.timer" in joined
     assert "agentos-board-projection.service" in joined
+    assert "agentos-theranos.timer" in joined
+    assert "agentos-theranos.service" in joined
     assert "agentos-youtube-ingestion.timer" in joined
     assert "agentos-youtube-ingestion.service" in joined
     assert "/var/lib/agent-os/youtube-ingestion" in joined
@@ -228,3 +230,14 @@ def test_root_helper_consumes_staged_bundle_not_github_network():
     assert '"fetch", "origin", "main"' not in helper
     assert 'GITHUB_TOKEN' not in helper
     assert 'GH_TOKEN' not in helper
+
+
+def test_agentos_theranos_units_are_fixed_activation_inputs():
+    helper = load_helper()
+
+    unit_sources = {source for source, _destination in helper.UNIT_FILES}
+    assert "runtime/systemd/agentos-theranos.service" in unit_sources
+    assert "runtime/systemd/agentos-theranos.timer" in unit_sources
+    assert "runtime/systemd/agentos-theranos.service" in helper.VERIFY_UNITS
+    assert "runtime/systemd/agentos-theranos.timer" in helper.VERIFY_UNITS
+    assert "agentos-theranos.timer" in helper.ENABLED_TIMERS
