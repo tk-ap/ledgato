@@ -46,6 +46,14 @@ UNIT_FILES = (
         "/etc/systemd/system/agentos-theranos.timer",
     ),
     (
+        "runtime/systemd/agentos-cockpit-projection.service",
+        "/etc/systemd/system/agentos-cockpit-projection.service",
+    ),
+    (
+        "runtime/systemd/agentos-cockpit-projection.timer",
+        "/etc/systemd/system/agentos-cockpit-projection.timer",
+    ),
+    (
         "runtime/systemd/agentos-workspace-board-publisher.service",
         "/etc/systemd/system/agentos-workspace-board-publisher.service",
     ),
@@ -77,6 +85,8 @@ VERIFY_UNITS = (
     "runtime/systemd/agentos-board-projection.timer",
     "runtime/systemd/agentos-theranos.service",
     "runtime/systemd/agentos-theranos.timer",
+    "runtime/systemd/agentos-cockpit-projection.service",
+    "runtime/systemd/agentos-cockpit-projection.timer",
     "runtime/systemd/agentos-workspace-board-publisher.service",
     "runtime/systemd/agentos-youtube-ingestion.service",
     "runtime/systemd/agentos-youtube-ingestion.timer",
@@ -86,6 +96,7 @@ ENABLED_TIMERS = (
     "agentos-runtime-checkout.timer",
     "agentos-board-projection.timer",
     "agentos-theranos.timer",
+    "agentos-cockpit-projection.timer",
     "agentos-youtube-ingestion.timer",
 )
 
@@ -404,6 +415,10 @@ def _activate() -> dict[str, Any]:
     # Publish the evidence-backed reality score after the runtime health and
     # canonical fleet state are available. The scorer itself is read-only.
     _run(["/usr/bin/systemctl", "start", "agentos-theranos.service"])
+
+    # The desktop projection consumes only the canonical Theranos output;
+    # start it after the scorer has refreshed that file.
+    _run(["/usr/bin/systemctl", "start", "agentos-cockpit-projection.service"])
 
     status = _status(mirror_sha=mirror_sha)
     if not status["healthy"]:

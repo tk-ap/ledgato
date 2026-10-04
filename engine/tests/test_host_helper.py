@@ -98,6 +98,8 @@ def test_activation_installs_only_fixed_units_and_fixed_systemd_actions(monkeypa
     assert "agentos-board-projection.service" in joined
     assert "agentos-theranos.timer" in joined
     assert "agentos-theranos.service" in joined
+    assert "agentos-cockpit-projection.timer" in joined
+    assert "agentos-cockpit-projection.service" in joined
     assert "agentos-youtube-ingestion.timer" in joined
     assert "agentos-youtube-ingestion.service" in joined
     assert "/var/lib/agent-os/youtube-ingestion" in joined
@@ -241,3 +243,14 @@ def test_agentos_theranos_units_are_fixed_activation_inputs():
     assert "runtime/systemd/agentos-theranos.service" in helper.VERIFY_UNITS
     assert "runtime/systemd/agentos-theranos.timer" in helper.VERIFY_UNITS
     assert "agentos-theranos.timer" in helper.ENABLED_TIMERS
+
+
+def test_agentos_cockpit_units_are_fixed_activation_inputs():
+    helper = load_helper()
+
+    unit_sources = {source for source, _destination in helper.UNIT_FILES}
+    assert "runtime/systemd/agentos-cockpit-projection.service" in unit_sources
+    assert "runtime/systemd/agentos-cockpit-projection.timer" in unit_sources
+    assert "runtime/systemd/agentos-cockpit-projection.service" in helper.VERIFY_UNITS
+    assert "runtime/systemd/agentos-cockpit-projection.timer" in helper.VERIFY_UNITS
+    assert "agentos-cockpit-projection.timer" in helper.ENABLED_TIMERS
