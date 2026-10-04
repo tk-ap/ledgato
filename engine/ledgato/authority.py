@@ -72,6 +72,7 @@ class AuthorityStore:
         credential_ref: str | None = None,
         parent_grant_id: str | None = None,
         ttl_seconds: int | None = None,
+        satisfies_approval: bool = False,
     ) -> AuthorityGrant:
         now = utcnow()
         tool_set = set(tools)
@@ -104,6 +105,7 @@ class AuthorityStore:
                 parent_grant_id=parent_grant_id,
                 issued_at=now.isoformat(),
                 expires_at=expires_at,
+                satisfies_approval=bool(satisfies_approval),
             )
             self._grants[grant.id] = grant
             self._save()

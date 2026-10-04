@@ -246,8 +246,10 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         "agentos.dispatch",
         "host.agentos.runtime.status",
         "host.agentos.runtime.activate",
+        "ledgato.session.grant",
     ]
-    assert policy["approve_tool"] == ["host.agentos.runtime.activate"]
+    # A session grant is allowed only as an owner-approved crossing.
+    assert policy["approve_tool"] == ["host.agentos.runtime.activate", "ledgato.session.grant"]
     assert policy["impact_max"] == "write"
     assert policy["data_domains"] == [
         "workspace-command::*",
@@ -255,6 +257,7 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         "hermes-command::*",
         "autonomous-backlog::*",
         "ashwood-host-01",
+        "ledgato-session::*",
     ]
 
     cfg = tmp_path / "fence.yaml"

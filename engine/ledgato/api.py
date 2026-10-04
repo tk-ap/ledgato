@@ -19,6 +19,7 @@ from . import attestation as attest_ops
 from .adapters.base import EnforcementAdapter
 from .adapters.github import GitHubAdapter
 from .adapters.host import HostActionAdapter
+from .adapters.session import SessionGrantAdapter
 from .adapters.x402 import X402Adapter
 from .approvals import ApprovalStore
 from .decision_prompt import (
@@ -281,6 +282,10 @@ def create_app(
     idempotency = IdempotencyStore(idempotency_path)
     campaigns = CampaignAuthorityStore(campaigns_path)
     registered_adapters = adapters if adapters is not None else _default_adapters_from_env()
+    if "session" not in registered_adapters:
+        # Inert unless a policy allows ledgato.session.grant; it only issues a
+        # grant from an owner approval (adapters/session.py).
+        registered_adapters = {**registered_adapters, "session": SessionGrantAdapter(authority)}
     gateway = EnforcementGateway(
         policies=policies,
         adapters=registered_adapters,
