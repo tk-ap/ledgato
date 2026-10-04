@@ -38,6 +38,14 @@ UNIT_FILES = (
         "/etc/systemd/system/agentos-board-projection.timer",
     ),
     (
+        "runtime/systemd/agentos-theranos.service",
+        "/etc/systemd/system/agentos-theranos.service",
+    ),
+    (
+        "runtime/systemd/agentos-theranos.timer",
+        "/etc/systemd/system/agentos-theranos.timer",
+    ),
+    (
         "runtime/systemd/agentos-workspace-board-publisher.service",
         "/etc/systemd/system/agentos-workspace-board-publisher.service",
     ),
@@ -67,6 +75,8 @@ VERIFY_UNITS = (
     "runtime/systemd/agentos-runtime-checkout.timer",
     "runtime/systemd/agentos-board-projection.service",
     "runtime/systemd/agentos-board-projection.timer",
+    "runtime/systemd/agentos-theranos.service",
+    "runtime/systemd/agentos-theranos.timer",
     "runtime/systemd/agentos-workspace-board-publisher.service",
     "runtime/systemd/agentos-youtube-ingestion.service",
     "runtime/systemd/agentos-youtube-ingestion.timer",
@@ -75,6 +85,7 @@ VERIFY_UNITS = (
 ENABLED_TIMERS = (
     "agentos-runtime-checkout.timer",
     "agentos-board-projection.timer",
+    "agentos-theranos.timer",
     "agentos-youtube-ingestion.timer",
 )
 
@@ -389,6 +400,10 @@ def _activate() -> dict[str, Any]:
     # Force one bounded projection now; its OnSuccess hook publishes the matching
     # snapshot through the existing publisher service.
     _run(["/usr/bin/systemctl", "start", "agentos-board-projection.service"])
+
+    # Publish the evidence-backed reality score after the runtime health and
+    # canonical fleet state are available. The scorer itself is read-only.
+    _run(["/usr/bin/systemctl", "start", "agentos-theranos.service"])
 
     status = _status(mirror_sha=mirror_sha)
     if not status["healthy"]:
