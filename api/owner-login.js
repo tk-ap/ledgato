@@ -48,19 +48,19 @@ function landing(next) {
     <div class="brand">LEDGAT<b>o</b></div>
     <div class="eyebrow">OWNER ACCESS</div>
     <h1>Sign in to LEDGATo.</h1>
-    <p>Use your ALVIRA owner identity to establish a scoped LEDGATo owner session. You return here after identity verification.</p>
+    <p>Authenticate to the LEDGATo control plane. Product surfaces such as ALVIRA, ailhat, and ASHWOOD are not parent identity systems for LEDGATo.</p>
 
     <section class="card">
-      <strong>Continue with ALVIRA</strong>
-      <p>ALVIRA confirms who you are. LEDGATo keeps its own owner session and authorization boundary.</p>
+      <strong>Identity method</strong>
+      <p>LEDGATo is an independent product. External identity providers authenticate the human only; they do not own LEDGATo sessions, policy, or enforcement authority.</p>
       <div class="actions">
-        <a class="primary" href="${continueHref}">Continue with ALVIRA →</a>
-        <a class="secondary" href="/app">Open LEDGATo</a>
+        <a class="primary" href="/login?provider=alvira&next=${encodeURIComponent(next)}">Use linked ALVIRA identity <span aria-hidden="true">→</span></a>
+        <a class="secondary" href="/app">Open existing LEDGATo session</a>
       </div>
-      <div class="meta">No LEDGATo password · no parallel identity store · server-bound handoff</div>
+      <div class="meta">Temporary compatibility provider · standalone LEDGATo auth is the target · authentication never grants agent authority</div>
     </section>
 
-    <p class="note">If your ALVIRA session has expired, the next step may ask you to sign in there before returning to LEDGATo.</p>
+    <p class="note">The linked ALVIRA path remains only as a migration/federation option while standalone LEDGATo account authentication is implemented. It is not a product dependency.</p>
   </main>
 </body>
 </html>`
@@ -73,16 +73,23 @@ module.exports = function handler(req, res) {
   }
 
   const next = safeNext(req.query && req.query.next)
-  const shouldStart = String((req.query && req.query.continue) || '') === '1'
+  const provider = String((req.query && req.query.provider) || '').toLowerCase()
 
   res.setHeader('Cache-Control', 'no-store')
 
-  if (!shouldStart) {
+  if (!provider) {
     res.statusCode = 200
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     return res.end(landing(next))
   }
 
+  if (provider !== 'alvira') {
+    res.statusCode = 400
+    return res.end('Unsupported identity provider')
+  }
+
+  // ALVIRA is a temporary optional federation/migration provider. It must not
+  // become the canonical LEDGATo identity authority.
   const verifier = crypto.randomBytes(32).toString('base64url')
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
   const state = crypto.randomBytes(24).toString('base64url')
