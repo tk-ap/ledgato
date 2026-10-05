@@ -11,18 +11,89 @@ function cookie(name, value, maxAge) {
   return `${name}=${encodeURIComponent(value)}; Path=/api/auth/alvira; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`
 }
 
+function landing(next) {
+  const continueHref = `/login?continue=1&next=${encodeURIComponent(next)}`
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Sign in · LEDGATo</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f5f3ee;background:#080907}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:
+      radial-gradient(circle at 18% 18%,rgba(255,193,67,.08),transparent 34rem),
+      radial-gradient(circle at 82% 70%,rgba(74,160,103,.08),transparent 30rem),
+      #080907;display:grid;place-items:center;padding:24px}
+    main{width:min(100%,520px)}
+    .brand{font-size:22px;letter-spacing:.08em;font-weight:650;margin-bottom:48px}
+    .brand b{font-weight:650;color:#efb848}
+    .eyebrow{font:600 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;color:#9c9b91;margin-bottom:14px}
+    h1{font-size:clamp(36px,8vw,58px);line-height:.98;letter-spacing:-.045em;margin:0 0 22px;max-width:8ch}
+    p{color:#aaa99f;font-size:16px;line-height:1.65;margin:0}
+    .card{margin-top:34px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.025);padding:24px;border-radius:18px}
+    .card strong{display:block;font-size:15px;margin-bottom:8px}
+    .actions{display:grid;gap:12px;margin-top:22px}
+    .primary,.secondary{display:flex;align-items:center;justify-content:center;min-height:50px;border-radius:999px;text-decoration:none;font-weight:650}
+    .primary{background:#f5f3ee;color:#11120f}
+    .secondary{border:1px solid rgba(255,255,255,.14);color:#f5f3ee}
+    .meta{margin-top:18px;font:500 11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;color:#6f7069}
+    .note{margin-top:30px;padding-top:22px;border-top:1px solid rgba(255,255,255,.08);font-size:13px;color:#7e7f77}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand">LEDGAT<b>o</b></div>
+    <div class="eyebrow">OWNER ACCESS</div>
+    <h1>Sign in to LEDGATo.</h1>
+    <p>Authenticate to the LEDGATo control plane. Product surfaces such as ALVIRA, ailhat, and ASHWOOD are not parent identity systems for LEDGATo.</p>
+
+    <section class="card">
+      <strong>Identity method</strong>
+      <p>LEDGATo is an independent product. External identity providers authenticate the human only; they do not own LEDGATo sessions, policy, or enforcement authority.</p>
+      <div class="actions">
+        <a class="primary" href="/login?provider=alvira&next=${encodeURIComponent(next)}">Use linked ALVIRA identity <span aria-hidden="true">→</span></a>
+        <a class="secondary" href="/app">Open existing LEDGATo session</a>
+      </div>
+      <div class="meta">Temporary compatibility provider · standalone LEDGATo auth is the target · authentication never grants agent authority</div>
+    </section>
+
+    <p class="note">The linked ALVIRA path remains only as a migration/federation option while standalone LEDGATo account authentication is implemented. It is not a product dependency.</p>
+  </main>
+</body>
+</html>`
+}
+
 module.exports = function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET')
     return res.status(405).send('Method Not Allowed')
   }
 
+  const next = safeNext(req.query && req.query.next)
+  const provider = String((req.query && req.query.provider) || '').toLowerCase()
+
+  res.setHeader('Cache-Control', 'no-store')
+
+  if (!provider) {
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    return res.end(landing(next))
+  }
+
+  if (provider !== 'alvira') {
+    res.statusCode = 400
+    return res.end('Unsupported identity provider')
+  }
+
+  // ALVIRA is a temporary optional federation/migration provider. It must not
+  // become the canonical LEDGATo identity authority.
   const verifier = crypto.randomBytes(32).toString('base64url')
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
   const state = crypto.randomBytes(24).toString('base64url')
-  const next = safeNext(req.query && req.query.next)
 
-  res.setHeader('Cache-Control', 'no-store')
   res.setHeader('Set-Cookie', [
     cookie('ledgato_auth_verifier', verifier, 300),
     cookie('ledgato_auth_state', state, 300),

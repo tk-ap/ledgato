@@ -46,9 +46,20 @@ local:
     - signed-evidence-does-not-by-itself-grant-execution-authority
     - production-runtime-and-buyer-proof-remain-evidence-dependent
     - boundary-claims-must-not-exceed-boundary-proof-registry
+    - ledgato-owns-its-identity-session-boundary
+    - external-product-identity-federation-is-optional-not-parental
+    - human-authentication-never-grants-agent-authority
+    - agentos-is-shared-execution-integration-not-ledgato-parent-product
 
 rules:
   canonical_product_role_from_routing_source: true
   local_metadata_may_narrow_or_add_implementation_detail: true
   local_metadata_must_not_redefine_canonical_role: true
   cross_product_writes_require_explicit_task_authorization: true
+
+identity_boundary:
+  canonical_direction: IDENTITY_PRODUCT_BOUNDARY.md
+  owns: [ledgato-account-session-boundary]
+  optional_federation: [alvira, future-oidc-or-passkey-providers]
+  must_not_require: [alvira, ailhat, ashwood]
+  execution_integration: agent-os

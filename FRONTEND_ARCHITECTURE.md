@@ -58,6 +58,29 @@ Own authentication entry points and guest-demo entry. Preserve current visual la
 
 Owns the browser control-plane experience. UI must consume a typed runtime-status contract instead of embedding assumptions about Python availability in route copy.
 
+## Identity / authentication boundary
+
+Canonical direction: `IDENTITY_PRODUCT_BOUNDARY.md`.
+
+The LEDGATo console owns its own application account/session boundary.
+
+External providers may authenticate/federate a human identity, but no ecosystem
+product is the required parent identity system for LEDGATo.
+
+In particular:
+
+- ALVIRA may be an optional linked identity provider during migration;
+- ailhat and ASHWOOD are not identity authorities for LEDGATo;
+- AgentOS is the primary shared execution integration, not the human login system;
+- a valid human session never creates standing agent authority.
+
+The `/login` route must first render a LEDGATo-owned sign-in landing. It must
+not automatically redirect the user to ALVIRA or another product before the user
+selects an identity method.
+
+The current ALVIRA handoff is a temporary compatibility route and must not be
+treated as the target standalone account architecture.
+
 ## Authenticated console charter
 
 The authenticated site is a **control room for autonomous enforcement**, not a workspace the user must keep open and not the mechanism that activates Ledgato.
