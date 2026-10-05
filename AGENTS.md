@@ -16,6 +16,25 @@ LEDGATo is not the generic workforce router and should not absorb every sensitiv
 
 Do not redefine those roles locally.
 
+## Identity and Product-Boundary Guardrail
+
+Before changing LEDGATo login, account/session ownership, cross-product identity
+handoff, or assumptions about ALVIRA / ailhat / ASHWOOD ownership, read
+`IDENTITY_PRODUCT_BOUNDARY.md`.
+
+Preserve these rules:
+
+- LEDGATo is an independent product and enforcement plane;
+- AgentOS is the shared execution integration;
+- ALVIRA, ailhat, and ASHWOOD are peer product surfaces, not LEDGATo parent products;
+- external identity providers may authenticate humans but do not grant agent authority;
+- LEDGATo must own its application-session/account boundary;
+- no ALVIRA session may become a mandatory architectural dependency for future LEDGATo use;
+- ALVIRA context may inform assurance but never grant authority;
+- do not conflate human login, product context, task authorization, and enforcement authority.
+
+The existing ALVIRA owner handoff is a migration compatibility path only.
+
 ## Boundary Proof Claim Guardrail
 
 Before making, changing, or implementing a claim about what Ledgato can enforce,
