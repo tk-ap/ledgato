@@ -42,6 +42,44 @@ the protected consequential boundaries configured to use it.
 
 LEDGATo may also protect a non-AgentOS execution path.
 
+## LEDGATo as both product surface and enforcement plane
+
+AgentOS may build, test, maintain, and deploy the LEDGATo product/repository just as it does for other ecosystem products.
+
+That does not collapse LEDGATo's enforcement role into AgentOS.
+
+The valid loop is:
+
+    AgentOS works on LEDGATo product code
+            ↓
+    proposed consequential LEDGATo change
+            ↓
+    independent protected boundary
+            ↓
+    LEDGATo / provider protections / human approval
+            ↓
+    exact execution + downstream verification
+
+A self-modifying governance product needs an independent root of trust.
+
+Therefore AgentOS' ability to edit or deploy LEDGATo must never, by itself, authorize changes that can weaken the enforcement boundary.
+
+Enforcement-critical changes include, at minimum:
+
+- policy evaluation logic;
+- permit/signature verification;
+- approval/decision semantics;
+- provider or protected-resource credentials;
+- signing keys / trust anchors;
+- bypass-prevention configuration;
+- protected adapter routing;
+- production activation/deactivation;
+- evidence integrity or verification paths.
+
+Those changes must preserve independent controls appropriate to the boundary, such as provider-side branch protections, separately scoped credentials, independent review, exact-action approval, and provider/resource-side verification.
+
+LEDGATo must not bootstrap trust solely from its own mutable application code.
+
 ## Authentication is not authority
 
 Human authentication answers:
