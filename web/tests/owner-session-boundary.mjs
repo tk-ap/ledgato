@@ -11,7 +11,7 @@ const callback=fs.readFileSync(path.join(repoRoot,'api/auth/alvira/callback.js')
 function fail(message){throw new Error(message)}
 
 const bySource=(source)=>(config.rewrites||[]).find(rule=>rule.source===source)
-if(bySource('/login')?.destination!=='/api/owner-login') fail('/login must start the ALVIRA owner handoff')
+if(bySource('/login')?.destination!=='/api/owner-login') fail('/login must stay on the server-owned LEDGATo owner-access route')
 if(bySource('/app')?.destination!=='/api/app-gate?next=/app') fail('/app must be server-gated')
 if(bySource('/app/:path*')?.destination!=='/api/app-gate?next=/app/:path*') fail('/app/** must be server-gated')
 const signup=(config.redirects||[]).find(rule=>rule.source==='/signup')
@@ -20,7 +20,10 @@ if(signup?.destination!=='/login') fail('/signup must not expose a second accoun
 for(const [source,label] of [[login,'owner login'],[callback,'callback'],[gate,'app gate']]){
   if(source.includes('LEDGATO_OWNER_PASSWORD')||source.includes('password_hash')) fail(`${label} must not create a parallel password authority`)
 }
-if(!login.includes('challenge')||!login.includes('verifier')||!login.includes('state')) fail('owner login must use PKCE-style handoff binding')
+if(!login.includes('Sign in to LEDGATo.')||!login.includes('Continue with ALVIRA')) fail('/login must present a LEDGATo-branded sign-in landing before identity handoff')
+if(!login.includes("const shouldStart = String((req.query && req.query.continue) || '') === '1'")) fail('ALVIRA handoff must require an explicit continue action from the LEDGATo landing')
+if(!login.includes('if (!shouldStart)')) fail('owner login must not redirect to ALVIRA before the user chooses to continue')
+if(!login.includes('challenge')||!login.includes('verifier')||!login.includes('state')) fail('owner login continuation must use PKCE-style handoff binding')
 if(!callback.includes('/api/handoff/ledgato/consume')) fail('callback must consume the ALVIRA handoff server-side')
 if(!gate.includes('/api/handoff/ledgato/session')) fail('app gate must validate the session against ALVIRA')
 if(!gate.includes("SESSION_COOKIE = 'ledgato_owner_session'")) fail('app gate must use the opaque owner session cookie')
