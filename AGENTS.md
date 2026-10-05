@@ -16,6 +16,26 @@ LEDGATo is not the generic workforce router and should not absorb every sensitiv
 
 Do not redefine those roles locally.
 
+## Self-Modification / Root-of-Trust Guardrail
+
+AgentOS may work on the LEDGATo product repository. That does not make AgentOS
+the enforcement authority for changes to LEDGATo's own enforcement-critical
+surfaces.
+
+Before modifying policy evaluation, permit/signature validation, approval
+semantics, provider credentials, signing keys/trust anchors, protected adapter
+routing, production enforcement activation, or evidence-integrity paths:
+
+- preserve an independent root of trust outside the mutable code path;
+- do not treat repository write access as authority to weaken enforcement;
+- preserve provider-side protections and independent review where applicable;
+- require exact-action authorization for consequential activation/deactivation;
+- verify the resulting provider/resource state independently;
+- never let LEDGATo "approve itself" solely through code that is part of the same untrusted change.
+
+AgentOS may build LEDGATo as a product surface while LEDGATo remains the
+independent enforcement plane for configured protected actions.
+
 ## Identity and Product-Boundary Guardrail
 
 Before changing LEDGATo login, account/session ownership, cross-product identity
