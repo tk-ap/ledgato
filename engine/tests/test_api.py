@@ -247,9 +247,11 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         "host.agentos.runtime.status",
         "host.agentos.runtime.activate",
         "ledgato.session.grant",
+        "github.pull.merge",
     ]
-    # A session grant is allowed only as an owner-approved crossing.
-    assert policy["approve_tool"] == ["host.agentos.runtime.activate", "ledgato.session.grant"]
+    # Session grants and merges are allowed only as owner-approved crossings.
+    assert policy["approve_tool"] == [
+        "host.agentos.runtime.activate", "github.pull.merge", "ledgato.session.grant"]
     assert policy["impact_max"] == "write"
     assert policy["data_domains"] == [
         "workspace-command::*",
@@ -258,6 +260,7 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         "autonomous-backlog::*",
         "ashwood-host-01",
         "ledgato-session::*",
+        "tk-ap/agent-os",
     ]
 
     cfg = tmp_path / "fence.yaml"

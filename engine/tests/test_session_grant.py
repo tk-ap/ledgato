@@ -149,3 +149,31 @@ def test_a_session_grant_is_never_issued_without_an_owner_approval(tmp_path):
     with pytest.raises(SessionGrantError):
         _request_session(gateway)
     assert not [g for g in authority.list() if g.satisfies_approval]
+
+
+def test_agentos_fence_merges_need_the_owner_or_a_session():
+    """The deployed policy: merges into tk-ap/agent-os only, owner-gated."""
+    from pathlib import Path
+
+    import yaml
+
+    from ledgato.engine import evaluate_action
+    from ledgato.models import AuthorityGrant, load_policies
+
+    source = Path(__file__).resolve().parents[1] / "examples" / "agent-os-workspace-fence.yaml"
+    policy = load_policies(yaml.safe_load(source.read_text()))["agent-os-workspace"]
+    merge = Action(tool="github.pull.merge", impact="write", domain="tk-ap/agent-os",
+                   params={"pull_number": 1})
+    assert evaluate_action(policy, merge).outcome == "APPROVE"
+
+    session = AuthorityGrant(id="grant_s", agent="agent-os-workspace", granted_by="owner-session:tk",
+                             purpose="session", tools={"github.pull.merge"},
+                             data_domains=["tk-ap/agent-os"], impact_max="write",
+                             expires_at=(utcnow() + timedelta(hours=1)).isoformat(),
+                             satisfies_approval=True)
+    assert evaluate_action(policy, merge, grant=session).outcome == "ALLOW"
+
+    elsewhere = Action(tool="github.pull.merge", impact="write", domain="tk-ap/ledgato",
+                       params={"pull_number": 1})
+    assert evaluate_action(policy, elsewhere).outcome == "DENY"
+    assert evaluate_action(policy, elsewhere, grant=session).outcome == "DENY"
