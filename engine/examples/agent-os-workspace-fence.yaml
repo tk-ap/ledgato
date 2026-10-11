@@ -15,8 +15,13 @@ policies:
       - host.agentos.runtime.status
       - host.agentos.runtime.activate
       - ledgato.session.grant
+      - github.pull.merge
     approve_tool:
       - host.agentos.runtime.activate
+      # Merges into tk-ap/agent-os go through Ledgato's GitHub adapter (the
+      # token lives only in the service environment) and are the owner's call,
+      # per merge or covered by an owner session grant.
+      - github.pull.merge
       # A session grant is always the owner's call; once approved it stands in
       # for per-action approval inside its own scope (adapters/session.py).
       - ledgato.session.grant
@@ -28,6 +33,7 @@ policies:
       - autonomous-backlog::*
       - ashwood-host-01
       - ledgato-session::*
+      - tk-ap/agent-os
     on_deny:
       - alert
       - human_review
