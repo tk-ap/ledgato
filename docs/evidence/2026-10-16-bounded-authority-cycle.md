@@ -1,0 +1,48 @@
+# Bounded authority-boundary evidence cycle — 2026-10-16
+
+**Status: SOURCE REVIEW COMPLETE; NEW REGRESSION SUITE COMMITTED; EXECUTION AND INDEPENDENT RE-VERIFICATION PENDING.**
+
+## Frozen reference
+- Canonical Ledgato branch: `main` at review time; exact immutable reference for this cycle's addition: `8634a712b4293d2c7bdf3ee58627a29b27a430e3` (branch commit; parent pins the reviewed main).
+- Agent OS: `tk-ap/agent-os` private, not checked out or executed in this session. No host integration or live deployment was changed.
+- Existing independent provider-lab result: `INDEPENDENT_VERIFICATION_RESULT.md` (2026-09-08, historical `f960f10`); **not re-executed today**.
+- Existing local two-process proof: `engine/examples/prove_enforcement_boundary.py`, documented in `engine/ENFORCEMENT_BOUNDARY_PROOF.md`; **not re-executed today**.
+
+## Documented prior adversarial observations (historical, not newly reproduced)
+- Without BLK-1 locking, a child grant was committed after parent revocation (142 microseconds); patch subsequently restored.
+- Without BLK-2 vector-specific remediation matching, evidence for one attack vector could close another; patch subsequently restored.
+- Independent live GitHub lab reported zero unauthorized merges across direct bypass, leakage, escalation and approval-abuse families; authoritative GitHub readback confirmed state.
+- F-3: pluralized `deny_tools` and `approve_tools` once silently disabled gates. Current `engine/ledgato/models.py` has `_POLICY_KEYS`, `_validate_policy_keys`, and `_aliased_tool_set`; new regression tests pin those semantics.
+
+## New deterministic fixture
+`engine/tests/test_authority_config_regression.py`: five tests for denial alias, approval alias, unknown-key rejection, restrictive allow-alias intersection, and deny/approval-alias union.
+
+### Reproduce locally (isolated checkout, no provider credentials)
+```sh
+git fetch origin evidence/2026-10-16-boundary-proof
+git checkout 8634a712b4293d2c7bdf3ee58627a29b27a430e3
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e './engine[dev]'
+python -m pytest -q engine/tests/test_authority_config_regression.py engine/tests/test_enforcement_boundary.py
+python engine/examples/prove_enforcement_boundary.py
+```
+Do not supply GitHub production credentials or enable `LEDGATO_LIVE_TESTS`.
+
+### Independent verification protocol
+A reviewer who did not author or change this fixture must:
+1. Check out the exact commit above and record `git rev-parse HEAD` and `git status --porcelain`.
+2. Run the five regression tests and the existing two-process proof, recording counts and full raw logs.
+3. Independently read the protected resource's persisted effects, rejected attempts and burned permits; verify DENY/APPROVE have zero effect and ALLOW exactly one.
+4. Try direct no-permit, forged signature, re-targeted contract, replay (including after restart), identity spoofing and unavailable-Ledgato paths. Verify no new effects. Review any untested matrix entry as a gap, not a pass.
+5. Audit alternate execution paths in Agent OS, especially credentials and `gh` subprocess paths. Until those are removed or bounded, no non-bypassability claim for the whole runtime.
+6. Sign a separate report identifying reviewer, source SHA, execution environment, raw logs, outcomes and outstanding gaps. Reviewer independence is **not yet established** for this cycle.
+
+## What can and cannot be claimed
+- **Claim supported by existing records:** A lab GitHub merge boundary received historical independent verification, within the documented scope. A synthetic resource was previously reported to enforce one-use signed permits in a two-process lab.
+- **Newly evidenced here:** The current policy parser source contains mitigation for the previously reported plural-key ambiguity, and dedicated regression tests have been committed.
+- **Not evidenced here:** Successful execution of these new tests, a newly observed bypass, independent re-verification, a live AgentOS-to-Ledgato boundary, production safety or general protection from agent escapes.
+- **Release decision:** **NO GO** for promoting enforcement maturity or expanding production authorization based on this cycle alone. Existing canonical maturity grades remain unchanged.
+
+## Disclosure for BlueDot
+Proposed work should independently challenge the remaining bypasses in a credential-separated Agent OS execution environment, publish failures and readback, and test whether authorization boundaries remain enforced after revocation, delegation and restart. This is a research hypothesis, not a certified product claim.
