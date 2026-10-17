@@ -46,3 +46,20 @@ A reviewer who did not author or change this fixture must:
 
 ## Disclosure for BlueDot
 Proposed work should independently challenge the remaining bypasses in a credential-separated Agent OS execution environment, publish failures and readback, and test whether authorization boundaries remain enforced after revocation, delegation and restart. This is a research hypothesis, not a certified product claim.
+
+
+## Follow-up audit — 2026-10-16, CI and Agent OS source
+
+### Execution evidence recovered
+- GitHub Actions run [39002375596](https://github.com/tk-ap/ledgato/actions/runs/39002375596), `engine-tests` job 117307824421: **318 passed, 10 skipped, 1 warning** on Python 3.12. The suite includes `test_end_to_end_proof_across_processes_and_restart` and five new parser-regression tests, but the aggregate quiet-mode log does not show individual test names or resource effects.
+- Same run, `github-denial-proof` job 117307824550: DENY of `github.pull.merge` for PR #100; `executed=false`, `boundary_crossed=false`; authenticated GitHub dual-signal readback returned unmerged with merge-status HTTP 404. This is a real-provider negative control, **not** proof of Agent OS credential isolation.
+- Raw evidence is in CI logs and uploaded artifacts of that run. No independently executed resource-state audit occurred in this follow-up.
+
+### Agent OS bypass-path audit
+- Current private `tk-ap/agent-os` `runtime/executor.py` blob `ac7c229f55e13529ee5c704f485ebfd94c62263f` contains a direct `subprocess.run(["gh", "api", path])` helper for **read-only repository metadata/content calls**. This establishes direct GitHub CLI connectivity in that path, **not** that this helper can merge.
+- Existing `docs/decisions/OWNER_INITIATED_AUTHORITY.md` records an intended `adapters.hermes.ledgato_merge` gate for merges, but a procedure document cannot prove worker credential custody or exclude other native API, subprocess, credential or inherited-session paths.
+- No trusted inspection of the current host's `gh auth status`, environment, credential stores, subprocess capabilities, runner service identity, or GitHub effective permissions was performed. Therefore **cannot establish** that Agent OS lacks a merge-capable credential or equivalent bypass.
+- The synthetic protected resource's persisted `resource.json` was not independently extracted from the CI artifact and read back in this session; the aggregate pytest green status is not the independent witness required for a higher maturity grade.
+
+### Final bounded-cycle disposition
+**PASS** for full CI suite and provider denial negative control. **INCONCLUSIVE / NOT VERIFIED** for fresh independent protected-resource readback and real Agent OS no-bypass claim. **NO GO** on promotion of runtime integration maturity. Keep the PR draft; do not activate or rotate any live credentials as part of this audit.
