@@ -61,6 +61,60 @@ def test_source_file_must_not_be_symlink(monkeypatch, tmp_path):
         raise AssertionError("symlink source unexpectedly accepted")
 
 
+def test_root_helper_refuses_staged_monitor_change_before_merge(monkeypatch, tmp_path):
+    helper = load_helper()
+    source_root = tmp_path / "source"
+    (source_root / ".git").mkdir(parents=True)
+    bundle = tmp_path / "bundle"
+    bundle.write_text("test bundle")
+
+    monkeypatch.setattr(helper, "SOURCE_ROOT", source_root)
+    monkeypatch.setattr(helper, "SOURCE_PARENT", tmp_path)
+    monkeypatch.setattr(helper, "SOURCE_BUNDLE", bundle)
+    monkeypatch.setattr(helper, "_assert_root_owned_path", lambda path: None)
+    monkeypatch.setattr(helper, "_bundle_main_sha", lambda: "a" * 40)
+    monkeypatch.setattr(helper, "_git_text", lambda *args: {
+        ("remote", "get-url", "origin"): helper.REMOTE,
+        ("branch", "--show-current"): "main",
+        ("status", "--porcelain"): "",
+        ("rev-parse", "refs/remotes/staged/main"): "a" * 40,
+    }[args])
+
+    calls = []
+
+    def fake_git(*args, **kwargs):
+        calls.append(args)
+        if args[:2] == ("diff", "--name-only"):
+            return type("Result", (), {
+                "stdout": "runtime/systemd/agentos-theranos.service\0README.md\0",
+                "returncode": 0,
+            })()
+        return type("Result", (), {"stdout": "", "returncode": 0})()
+
+    monkeypatch.setattr(helper, "_git", fake_git)
+    try:
+        helper._ensure_source()
+    except helper.HostOperationError as exc:
+        assert "separate owner-authorized activation" in str(exc)
+        assert "agentos-theranos.service" in str(exc)
+    else:
+        raise AssertionError("monitoring change unexpectedly activated")
+
+    assert not any(call[:1] == ("merge",) for call in calls)
+
+
+def test_root_helper_allows_unprotected_paths_to_pass_monitor_guard():
+    helper = load_helper()
+    assert helper._protected_monitor_changes(["README.md"]) == []
+    assert helper._protected_monitor_changes([
+        "adapters/hermes/fleet/auto_update.py",
+        "runtime/systemd/agentos-theranos.timer",
+    ]) == [
+        "adapters/hermes/fleet/auto_update.py",
+        "runtime/systemd/agentos-theranos.timer",
+    ]
+
+
 def test_activation_installs_only_fixed_units_and_fixed_systemd_actions(monkeypatch):
     helper = load_helper()
     calls = []

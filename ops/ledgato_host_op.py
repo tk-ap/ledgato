@@ -102,6 +102,29 @@ ENABLED_TIMERS = (
 
 OPERATIONS = {"agentos-runtime-activate", "agentos-runtime-status"}
 
+# Fixed in the root-owned helper. Never read this policy from the staged
+# AgentOS bundle, which the executing worker can propose changes to.
+PROTECTED_MONITOR_PATHS = (
+    "adapters/hermes/fleet/auto_update.py",
+    "adapters/hermes/fleet/host_access_watchdog.py",
+    "adapters/hermes/fleet/runtime_doctor.py",
+    "adapters/hermes/fleet/telegram_human_monitor.py",
+    "adapters/hermes/fleet/systemd/agent-os-host-access-watchdog.",
+    "runtime/theranos.py",
+    "registry/theranos-claims.yaml",
+    "runtime/systemd/agentos-theranos.",
+    "runtime/systemd/ledgato-agentos.service",
+)
+
+
+def _protected_monitor_changes(paths: list[str]) -> list[str]:
+    return sorted(
+        path for path in paths
+        if any(path == prefix or path.startswith(prefix)
+               for prefix in PROTECTED_MONITOR_PATHS)
+    )
+
+
 
 class HostOperationError(RuntimeError):
     pass
@@ -228,6 +251,16 @@ def _ensure_source() -> str:
     if ancestor.returncode != 0:
         raise HostOperationError(
             "root-owned AgentOS mirror is not a fast-forward ancestor of staged main"
+        )
+    # Approval of an ordinary runtime activation is not approval to weaken
+    # monitoring. Refuse before moving the root-owned mirror or installing
+    # units; an explicit, independently authorized change path is required.
+    changed = _git("diff", "--name-only", "-z", "HEAD", "refs/remotes/staged/main").stdout
+    protected = _protected_monitor_changes([path for path in changed.split("\0") if path])
+    if protected:
+        raise HostOperationError(
+            "monitoring change requires separate owner-authorized activation: "
+            + ", ".join(protected)
         )
     _git("merge", "--ff-only", "refs/remotes/staged/main")
     _git("update-ref", "refs/remotes/origin/main", "refs/remotes/staged/main")
