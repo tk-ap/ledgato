@@ -170,3 +170,17 @@ def test_a_fifo_in_the_inbox_is_refused(world):
     os.mkfifo(fifo)
     with pytest.raises(ValueError, match="regular file"):
         publish(adapter, fifo, head="1" * 40, sha="0" * 64)
+
+
+def test_publishing_works_through_the_gateways_context_path(world):
+    """With #103 combined, the gateway calls execute_with_context for every GitHub action."""
+    adapter, work, inbox, remote = world
+    head = git("rev-parse", "HEAD", cwd=work)
+    path = bundle(work, inbox)
+    action = Action(tool="github.branch.publish", impact="write", params={
+        "branch": "claude/fix", "bundle": str(path), "head": head,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    receipt = adapter.execute_with_context(action, agent="agent-os", approved_by=None,
+                                           approval_id=None, task_id="agentos-push-claude-fix",
+                                           grant_id=None)
+    assert receipt.executed and git("rev-parse", "refs/heads/claude/fix", cwd=remote) == head

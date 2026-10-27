@@ -14,6 +14,8 @@ import stat
 import subprocess
 import tempfile
 from pathlib import Path
+from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Any
 from urllib import error, request
 
@@ -53,6 +55,56 @@ class GitHubAdapter:
         if permissions.get("admin"):
             capabilities.add("github.repo.admin")
         return capabilities
+
+    def execute_with_context(self, action: Action, *, agent: str, approved_by: str | None,
+                             approval_id: str | None, task_id: str | None = None,
+                             grant_id: str | None = None) -> ExecutionReceipt:
+        """Merge with Ledgato's approval signed onto the merge commit.
+
+        GitHub records every merge under the token's account, so the merge
+        commit itself says which Ledgato task and approval allowed it. Only the
+        gateway knows those at execution time, which is why the agent never
+        writes them.
+
+        The approved action must say so (`signature: "ledgato"`), so what TK
+        approved includes that the merge is signed; the exact message sent is
+        recorded in the receipt as `effective_commit_message`, and verify()
+        reads it back from GitHub. A rebase merge has no merge commit to carry
+        the signature and is refused.
+        """
+        if action.tool != "github.pull.merge":
+            return self.execute(action)
+        if action.params.get("signature") != SIGNATURE:
+            raise ValueError("a merge must be approved as signed (params.signature = 'ledgato')")
+        if action.params.get("merge_method") == "rebase":
+            raise ValueError("a rebase merge leaves no merge commit to carry the approval")
+        number = _required_int(action.params, "pull_number")
+        via = "owner_card" if approved_by else ("grant" if grant_id else "policy")
+        signature = [("Ledgato-Task", task_id),
+                     ("Ledgato-Approval", approval_id or grant_id),
+                     ("Approved-Via", via),
+                     ("Approved-By", approved_by),
+                     ("Approved-At", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
+                     ("Reviewed-Commit", action.params.get("sha"))]
+        message = merge_message(self._pull_commits(number), action.params.get("commit_message"),
+                                [f"{key}: {value}" for key, value in signature if value])
+        receipt = self.execute(replace(action, params={**action.params, "commit_message": message}))
+        receipt.result = {**(receipt.result or {}), "effective_commit_message": message,
+                          "signature_trailers": [line for line in message.splitlines()
+                                                 if _is_signature(line)]}
+        return receipt
+
+    def _pull_commits(self, number: int) -> list[str]:
+        """The pull request's commit messages, or none if they can't be read.
+
+        Unreadable commits cost the agents' signatures, not the merge: the
+        approval TK gave is still carried out and signed.
+        """
+        try:
+            commits = self._call("GET", f"/repos/{self.repository}/pulls/{number}/commits?per_page=250")
+        except RuntimeError:
+            return []
+        return [str((item.get("commit") or {}).get("message") or "") for item in commits or []]
 
     def execute(self, action: Action) -> ExecutionReceipt:
         if action.tool == "github.pull.merge":
@@ -212,12 +264,22 @@ class GitHubAdapter:
                 and receipt_sha_matches
                 and (not state["merged"] or state.get("merge_commit_exists") is True)
             )
+            signed = None
+            expected = (receipt.result or {}).get("signature_trailers")
+            if receipt.executed and expected:
+                # The provider's own copy of the merge commit must carry every
+                # line the gateway signed; a receipt alone is not proof.
+                landed = [line for line in str(state.get("merge_commit_message") or "").splitlines()
+                          if _is_signature(line)]
+                signed = landed == expected
+                verified = verified and signed
             return {
                 "verified": verified,
                 "method": "github_pull_dual_readback",
-                **state,
+                **{k: v for k, v in state.items() if k != "merge_commit_message"},
                 "receipt_sha": receipt.external_id,
                 "receipt_sha_matches": receipt_sha_matches,
+                "signature_landed": signed,
             }
         if action.tool == "github.issue.comment":
             comment_id = receipt.external_id
@@ -273,6 +335,7 @@ class GitHubAdapter:
 
         merge_commit_sha = pr.get("merge_commit_sha")
         merge_commit_exists: bool | None = None
+        merge_commit_message: str | None = None
         if endpoint_merged:
             if merge_commit_sha:
                 try:
@@ -282,6 +345,7 @@ class GitHubAdapter:
                         fresh=True,
                     )
                     merge_commit_exists = str(commit.get("sha")) == str(merge_commit_sha)
+                    merge_commit_message = (commit.get("commit") or {}).get("message")
                 except RuntimeError:
                     merge_commit_exists = False
             else:
@@ -295,6 +359,7 @@ class GitHubAdapter:
             "merged_at": pr.get("merged_at"),
             "merge_commit_sha": merge_commit_sha,
             "merge_commit_exists": merge_commit_exists,
+            "merge_commit_message": merge_commit_message,
             "base_ref": (pr.get("base") or {}).get("ref"),
             "head_sha": (pr.get("head") or {}).get("sha"),
         }
@@ -370,6 +435,39 @@ class GitHubAdapter:
 BRANCH_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,199}")
 PROTECTED_BRANCHES = {"main", "master", "head"}
 MAX_BUNDLE_BYTES = 50 * 1024 * 1024
+
+
+SIGNATURE = "ledgato"
+SIGNATURE_KEYS = ("ledgato-", "approved-", "reviewed-commit")
+
+
+def _is_signature(line: str) -> bool:
+    return line.partition(":")[0].strip().lower().startswith(SIGNATURE_KEYS) and ":" in line
+
+
+# Commit trailers carried from a pull request's commits onto its merge commit:
+# the agents' own signatures and GitHub co-author credit.
+CARRIED_TRAILERS = ("agent-harness", "agent-model", "co-authored-by")
+
+
+def merge_message(commits: list[str], body: str | None, signature: list[str]) -> str:
+    """A squash body listing the commits, their signatures, then Ledgato's.
+
+    Setting commit_message replaces GitHub's default squash body, which is
+    where the agents' trailers would otherwise survive, so they are carried
+    here. Any Ledgato-* or Approved-* line an agent wrote is dropped: only the
+    gateway signs an approval.
+    """
+    carried: list[str] = []
+    for message in commits:
+        for line in message.strip().splitlines():
+            key = line.partition(":")[0].strip().lower()
+            if key in CARRIED_TRAILERS and line.strip() not in carried:
+                carried.append(line.strip())
+    if body is None:
+        body = "\n".join(f"* {message.strip().splitlines()[0]}" for message in commits if message.strip())
+    kept = [line for line in str(body).splitlines() if not _is_signature(line)]
+    return "\n".join(part for part in ("\n".join(kept).strip(), "\n".join(carried + signature)) if part)
 
 
 def _required_int(params: dict[str, Any], key: str) -> int:
