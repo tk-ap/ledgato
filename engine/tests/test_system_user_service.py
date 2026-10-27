@@ -33,3 +33,37 @@ def test_the_installer_parses_and_never_prints_secret_values():
     assert not re.search(r"\bcat\b[^\n]*(gateway\.env|ledgato\.env)", text)
     assert "LEDGATO_PRINCIPALS" in text and "APPROVER" in text
     assert "--service-user ledgato" in text, "host-op sudo must move to the gateway account"
+
+
+def _position(text, needle):
+    index = text.find(needle)
+    assert index >= 0, needle
+    return index
+
+
+def test_nothing_of_the_owners_changes_before_the_new_gateway_is_healthy():
+    """Codex review of 225d552: sudo and state were cut over before the health check."""
+    text = INSTALLER.read_text()
+    healthy = _position(text, "ledgato.service is healthy as ledgato")
+    for cutover in ('install_ledgato_host_op.sh" --service-user ledgato',
+                    'rm -rf -- "${OLD_STATE}"',
+                    '"${CLIENT}" "${OLD_ENV}"'):
+        assert _position(text, cutover) > healthy, cutover
+
+
+def test_the_gateway_env_is_written_as_plain_assignments():
+    assert "sed -E 's/^export[[:space:]]+//'" in INSTALLER.read_text()
+
+
+def test_every_state_item_is_compared_and_a_partial_copy_is_never_trusted():
+    text = INSTALLER.read_text()
+    assert "idempotency.json" in text.split("STATE_ITEMS=(", 1)[1].split(")", 1)[0]
+    assert "mktemp -d /var/lib/ledgato/state.staging." in text
+    assert "exists and differs" in text
+
+
+def test_the_code_the_unit_runs_is_the_code_that_was_verified():
+    text = INSTALLER.read_text()
+    assert 'SOURCE="/var/lib/ledgato/source"' in text
+    assert "PYTHONPATH=/var/lib/ledgato/source/engine" in UNIT
+    assert "! -user root -o -perm /022" in text
