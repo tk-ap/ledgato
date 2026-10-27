@@ -1,0 +1,30 @@
+# Ledgato gateway as its own system user (installed by ops/install_ledgato_service.sh).
+#
+# It used to run as a user service of the owner account, which every agent on
+# the host also runs as: the GitHub token, the principals' secrets, the ledger,
+# its signing keys and the approval/grant stores were all readable and writable
+# by the agents it governs. As `ledgato` they are not.
+#
+# No ProtectSystem/ProtectHome: the runtime-activation helper runs through sudo
+# inside this unit's mount namespace and must reach the AgentOS runtime.
+# File ownership is the boundary here.
+[Unit]
+Description=Ledgato AgentOS enforcement gateway
+After=network.target
+
+[Service]
+Type=simple
+User=ledgato
+Group=ledgato
+WorkingDirectory=/var/lib/ledgato/state
+EnvironmentFile=/etc/ledgato/gateway.env
+Environment=PYTHONPATH=/var/lib/ledgato/source/engine
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/ledgato/venv/bin/python -m ledgato.cli api --config /var/lib/ledgato/source/engine/examples/agent-os-workspace-fence.yaml --ledger /var/lib/ledgato/state/agentos-workspace-ledger.jsonl --keys /var/lib/ledgato/state/agentos-workspace-keys --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=3
+UMask=0077
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
