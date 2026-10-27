@@ -115,6 +115,10 @@ class GitHubAdapter:
                 self.mirror.parent.mkdir(parents=True, exist_ok=True)
                 self._git(["init", "--quiet", "--bare", str(self.mirror)], env, cwd=None)
             self._git(["fetch", "--quiet", self.git_url, "+refs/heads/main:refs/remotes/origin/main"], env)
+            # The branch's own published history too, so a bundle that only adds
+            # to it resolves; a new branch simply has none yet.
+            self._git(["fetch", "--quiet", self.git_url,
+                       f"+refs/heads/{branch}:refs/remotes/origin/{branch}"], env, missing_ok=True)
             heads = self._git(["bundle", "list-heads", str(bundle)], env).split()
             if heads != [head, f"refs/heads/{branch}"]:
                 raise ValueError("the bundle must carry exactly the declared branch at the declared head")
@@ -138,9 +142,12 @@ class GitHubAdapter:
                 "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
                 "GIT_CONFIG_VALUE_0": f"AUTHORIZATION: basic {basic}"}
 
-    def _git(self, args: list[str], env: dict[str, str], cwd: Path | None | str = "mirror") -> str:
+    def _git(self, args: list[str], env: dict[str, str], cwd: Path | None | str = "mirror",
+             missing_ok: bool = False) -> str:
         command = ["git", *([] if cwd is None else ["--git-dir", str(self.mirror)]), *args]
         done = subprocess.run(command, env=env, capture_output=True, text=True, timeout=300)
+        if done.returncode and missing_ok and "couldn't find remote ref" in done.stderr:
+            return ""
         if done.returncode:
             raise RuntimeError(f"git {args[0]} failed: {done.stderr.strip()[:200]}")
         return done.stdout

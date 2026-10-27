@@ -118,3 +118,18 @@ def test_the_token_never_appears_on_a_command_line(world, monkeypatch):
     monkeypatch.setattr(subprocess, "run", spy)
     publish(adapter, bundle(work, inbox), head=git("rev-parse", "HEAD", cwd=work))
     assert seen and not any("test-token" in part for command in seen for part in command)
+
+
+def test_a_bundle_that_only_adds_to_a_published_branch_resolves(world):
+    """The mailbox's coordination branch grows one message at a time."""
+    adapter, work, inbox, remote = world
+    publish(adapter, bundle(work, inbox), head=git("rev-parse", "HEAD", cwd=work))
+    git("fetch", "-q", "origin", cwd=work)
+    (work / "c.txt").write_text("c\n")
+    git("add", ".", cwd=work)
+    git("commit", "-qm", "more", cwd=work)
+    path = inbox / "more.bundle"
+    git("bundle", "create", "-q", str(path), "claude/fix", "^origin/main", "^origin/claude/fix", cwd=work)
+    head = git("rev-parse", "HEAD", cwd=work)
+    publish(adapter, path, head=head)
+    assert git("rev-parse", "refs/heads/claude/fix", cwd=remote) == head
