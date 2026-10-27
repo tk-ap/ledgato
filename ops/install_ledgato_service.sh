@@ -74,6 +74,9 @@ chmod -R go-w /opt/ledgato
 # 3. State, copied and verified before the owner's copy is archived away.
 install -d -o root -g root -m 0700 "${ARCHIVE}"
 install -d -o ledgato -g ledgato -m 0700 "${STATE}"
+# Branch bundles from agents: anyone may drop a file, nobody may list or
+# remove another's (sticky, no read for others); the gateway owns it.
+install -d -o ledgato -g ledgato -m 1733 /var/lib/ledgato/inbox
 if [[ -z "$(ls -A "${STATE}")" && -d "${OLD_STATE}" ]]; then
   for item in agentos-workspace-ledger.jsonl agentos-workspace-keys approvals.json authority.json idempotency.json; do
     [[ -e "${OLD_STATE}/${item}" ]] && cp -a "${OLD_STATE}/${item}" "${STATE}/"

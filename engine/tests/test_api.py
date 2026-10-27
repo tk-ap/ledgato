@@ -248,8 +248,10 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         "host.agentos.runtime.activate",
         "ledgato.session.grant",
         "github.pull.merge",
+        "github.branch.publish",
     ]
     # Session grants and merges are allowed only as owner-approved crossings.
+    # Branch publishing is not: the adapter refuses main, so it needs no card.
     assert policy["approve_tool"] == [
         "host.agentos.runtime.activate", "github.pull.merge", "ledgato.session.grant"]
     assert policy["impact_max"] == "write"
