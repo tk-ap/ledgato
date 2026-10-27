@@ -5,12 +5,87 @@ non-bypassable, the governed agent must not also possess an equivalent token.
 """
 from __future__ import annotations
 
+import base64
 import json
-from typing import Any
+import threading
+import time
+from typing import Any, Callable
 from urllib import error, request
 
 from .base import ExecutionReceipt
 from ..models import Action
+
+
+class GitHubAppCredential:
+    """Short-lived installation tokens for a GitHub App, scoped to one repository.
+
+    With an App, the merge credential is not a person's: a ruleset on main can
+    let only this App through, so no agent holding the owner's login can merge
+    or push around the boundary. Tokens last an hour and are renewed early.
+    """
+
+    REFRESH_BEFORE = 300
+
+    def __init__(self, *, app_id: str, installation_id: str, private_key_pem: bytes,
+                 repository: str, api_url: str | None = None,
+                 opener: Callable[..., Any] = request.urlopen, clock: Callable[[], float] = time.time):
+        from cryptography.hazmat.primitives import serialization
+
+        self.app_id = str(app_id)
+        self.installation_id = str(installation_id)
+        self._key = serialization.load_pem_private_key(private_key_pem, password=None)
+        self.repository = repository
+        self.api_url = (api_url or GitHubAdapter.API).rstrip("/")
+        self._open = opener
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._token: str | None = None
+        self._expires = 0.0
+        self.permissions: dict[str, str] = {}
+
+    def _jwt(self) -> str:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import padding
+
+        def part(value: dict[str, Any]) -> str:
+            raw = json.dumps(value, separators=(",", ":")).encode()
+            return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+        now = int(self._clock())
+        signing_input = (part({"alg": "RS256", "typ": "JWT"}) + "."
+                         + part({"iat": now - 60, "exp": now + 540, "iss": self.app_id}))
+        signature = self._key.sign(signing_input.encode(), padding.PKCS1v15(), hashes.SHA256())
+        return signing_input + "." + base64.urlsafe_b64encode(signature).rstrip(b"=").decode()
+
+    def token(self) -> str:
+        with self._lock:
+            if self._token and self._clock() < self._expires - self.REFRESH_BEFORE:
+                return self._token
+            name = self.repository.split("/", 1)[1]
+            req = request.Request(
+                f"{self.api_url}/app/installations/{self.installation_id}/access_tokens",
+                data=json.dumps({"repositories": [name]}).encode(), method="POST",
+                headers={"Accept": "application/vnd.github+json",
+                         "Authorization": f"Bearer {self._jwt()}",
+                         "X-GitHub-Api-Version": "2022-11-28",
+                         "Content-Type": "application/json", "User-Agent": "ledgato-gateway"})
+            try:
+                with self._open(req, timeout=20) as resp:  # nosec - fixed GitHub API
+                    issued = json.loads(resp.read().decode())
+            except error.HTTPError as exc:
+                raise RuntimeError(f"GitHub App token request failed ({exc.code})") from exc
+            repos = {str(r.get("full_name")) for r in issued.get("repositories") or []}
+            if repos and self.repository not in repos:
+                raise RuntimeError("GitHub App token does not cover the configured repository")
+            expires = str(issued.get("expires_at") or "")
+            try:
+                from datetime import datetime
+                self._expires = datetime.fromisoformat(expires.replace("Z", "+00:00")).timestamp()
+            except ValueError:
+                self._expires = self._clock() + 3600
+            self._token = str(issued["token"])
+            self.permissions = {str(k): str(v) for k, v in (issued.get("permissions") or {}).items()}
+            return self._token
 
 
 class GitHubAdapter:
@@ -18,16 +93,36 @@ class GitHubAdapter:
     API = "https://api.github.com"
     is_live_provider = True
 
-    def __init__(self, *, repository: str, token: str, api_url: str | None = None):
+    def __init__(self, *, repository: str, token: str | None = None, api_url: str | None = None,
+                 app: GitHubAppCredential | None = None):
         if "/" not in repository:
             raise ValueError("repository must be owner/name")
+        if not token and app is None:
+            raise ValueError("a GitHub token or a GitHub App credential is required")
         self.repository = repository
         self.boundary_resource = repository
         self.token = token
+        self.app = app
         self.api_url = (api_url or self.API).rstrip("/")
+
+    def _bearer(self) -> str:
+        return self.app.token() if self.app is not None else str(self.token)
 
     def discover(self, agent: str) -> set[str]:
         """Inspect the live repository permission carried by this credential."""
+        if self.app is not None:
+            # An installation token has no per-user `permissions` on the repo;
+            # what it may do is what the installation token was issued with.
+            self.app.token()
+            granted = self.app.permissions
+            capabilities: set[str] = {"github.repo.read"}
+            if granted.get("contents") == "write" and granted.get("pull_requests") == "write":
+                capabilities.add("github.pull.merge")
+            if granted.get("issues") == "write" or granted.get("pull_requests") == "write":
+                capabilities.add("github.issue.comment")
+            if granted.get("administration") == "write":
+                capabilities.add("github.repo.admin")
+            return capabilities
         repo = self._call("GET", f"/repos/{self.repository}")
         permissions = repo.get("permissions") or {}
         capabilities: set[str] = {"github.repo.read"}
@@ -174,7 +269,7 @@ class GitHubAdapter:
     def _headers(self, *, fresh: bool = False) -> dict[str, str]:
         headers = {
             "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {self.token}",
+            "Authorization": f"Bearer {self._bearer()}",
             "X-GitHub-Api-Version": "2022-11-28",
             "Content-Type": "application/json",
             "User-Agent": "ledgato-gateway",

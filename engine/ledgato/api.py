@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from . import attestation as attest_ops
 from .adapters.base import EnforcementAdapter
-from .adapters.github import GitHubAdapter
+from .adapters.github import GitHubAdapter, GitHubAppCredential
 from .adapters.host import HostActionAdapter
 from .adapters.session import SessionGrantAdapter
 from .adapters.x402 import X402Adapter
@@ -903,7 +903,23 @@ def _default_adapters_from_env() -> dict[str, EnforcementAdapter]:
     # Provider mutation authority must be explicitly assigned to the Ledgato
     # boundary. Never inherit a generic GitHub token from the surrounding host.
     token = os.getenv("LEDGATO_GITHUB_TOKEN")
-    if repository and token:
+    # A GitHub App, when configured, replaces the token: the merge credential
+    # then belongs to the boundary, not to the owner's account, so a ruleset on
+    # main can admit only it.
+    app_id = os.getenv("LEDGATO_GITHUB_APP_ID")
+    installation_id = os.getenv("LEDGATO_GITHUB_APP_INSTALLATION_ID")
+    key_file = os.getenv("LEDGATO_GITHUB_APP_PRIVATE_KEY_FILE")
+    if repository and app_id and installation_id and key_file:
+        with open(key_file, "rb") as handle:
+            key = handle.read()
+        adapters["github"] = GitHubAdapter(
+            repository=repository,
+            app=GitHubAppCredential(app_id=app_id, installation_id=installation_id,
+                                    private_key_pem=key, repository=repository,
+                                    api_url=os.getenv("LEDGATO_GITHUB_API_URL")),
+            api_url=os.getenv("LEDGATO_GITHUB_API_URL"),
+        )
+    elif repository and token:
         adapters["github"] = GitHubAdapter(
             repository=repository,
             token=token,
