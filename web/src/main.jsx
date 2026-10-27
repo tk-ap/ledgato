@@ -304,7 +304,7 @@ function ProgressiveAuthorityPanel(){
     }
   }
 
-  const {approval,linked,missing}=pickApproval(state.approvals,linkedTask(location.search))
+  const {approval,linked,missing,invalid,ambiguous}=pickApproval(state.approvals,linkedTask(location.search))
   const info=actionLabel(approval)
   const waiting=state.approvals.length
 
@@ -324,6 +324,10 @@ function ProgressiveAuthorityPanel(){
     {state.kind==='auth'&&<div className="pocEmptyAction"><strong>Owner session needs to be restored</strong><span>{state.message} Re-enter through the ALVIRA owner handoff; the workspace will not create a second local login.</span><a href="/login?next=/app">Restore owner session →</a></div>}
 
     {state.kind==='unavailable'&&<div className="pocEmptyAction"><strong>Live control path unavailable</strong><span>{state.message==='engine_control_not_configured'?'Your owner session is valid, but the production app has no configured route to the LEDGATo engine yet.':state.message} Historical proof remains below; this state is not presented as live enforcement.</span><button className="quietButton" onClick={load}>Retry</button></div>}
+
+    {state.kind==='connected'&&invalid&&<div className="pocEmptyAction"><strong>This approval link is invalid.</strong><span>No approval was selected. <a href="/app">Show pending approvals</a></span></div>}
+
+    {state.kind==='connected'&&ambiguous&&<div className="pocEmptyAction"><strong>More than one pending approval matches task <code>{linked}</code>.</strong><span>No approval was selected. <a href="/app">Show pending approvals</a></span></div>}
 
     {state.kind==='connected'&&missing&&<div className="pocEmptyAction"><strong>No pending approval for task <code>{linked}</code></strong><span>It may already be decided or expired. {approval?'Showing the next action that is waiting instead.':''}</span></div>}
 
