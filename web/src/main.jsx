@@ -2,6 +2,7 @@ import React, {useEffect, useMemo, useState} from 'react'
 import {createRoot} from 'react-dom/client'
 import {claims,statusLabels} from './content/claims.js'
 import './styles.css'
+import {linkedTask,pickApproval} from './approval-link.js'
 
 const appRoutes=[['/app','Overview'],['/app/agents','Agents'],['/app/boundaries','Boundaries'],['/app/authority','Authority'],['/app/policies','Policies'],['/app/verification','Verification'],['/app/runtime','Runtime'],['/app/releases','Releases'],['/app/alvira','Live Alvira'],['/app/evidence','Evidence']]
 const sampleAgents=[{id:'support-bot',name:'support-bot',identity:'svc-support',status:'protected',risk:'medium',tools:['crm.search','billing.read','ticket.create','email.send'],dataSources:['Customer.email'],destinations:['approved-api']},{id:'release-agent',name:'release-agent',identity:'github-app',status:'review',risk:'high',tools:['github.pull.create','github.check.read'],dataSources:['repository'],destinations:['github.com']}]
@@ -303,14 +304,15 @@ function ProgressiveAuthorityPanel(){
     }
   }
 
-  const approval=state.approvals[0]
+  const {approval,linked,missing}=pickApproval(state.approvals,linkedTask(location.search))
   const info=actionLabel(approval)
+  const waiting=state.approvals.length
 
   return <section className="pocAttention liveAuthority">
     <div className="pocSectionHead">
       <div>
         <span className="pocKicker">WHAT NEEDS YOU</span>
-        <h2>{approval?'One consequential action is waiting for a decision.':'Nothing needs you right now.'}</h2>
+        <h2>{approval?(waiting>1?`${waiting} consequential actions are waiting for a decision.`:'One consequential action is waiting for a decision.'):'Nothing needs you right now.'}</h2>
       </div>
       <span className={'pocBadge '+(state.kind==='connected'?'verified':'pending')}>
         {state.kind==='connected'?'OWNER + ENGINE':'CONTROL STATUS'}
@@ -322,6 +324,8 @@ function ProgressiveAuthorityPanel(){
     {state.kind==='auth'&&<div className="pocEmptyAction"><strong>Owner session needs to be restored</strong><span>{state.message} Re-enter through the ALVIRA owner handoff; the workspace will not create a second local login.</span><a href="/login?next=/app">Restore owner session →</a></div>}
 
     {state.kind==='unavailable'&&<div className="pocEmptyAction"><strong>Live control path unavailable</strong><span>{state.message==='engine_control_not_configured'?'Your owner session is valid, but the production app has no configured route to the LEDGATo engine yet.':state.message} Historical proof remains below; this state is not presented as live enforcement.</span><button className="quietButton" onClick={load}>Retry</button></div>}
+
+    {state.kind==='connected'&&missing&&<div className="pocEmptyAction"><strong>No pending approval for task <code>{linked}</code></strong><span>It may already be decided or expired. {approval?'Showing the next action that is waiting instead.':''}</span></div>}
 
     {state.kind==='connected'&&!approval&&<div className="pocEmptyAction"><strong>No pending approvals</strong><span>Configured boundaries continue running without this page open. You appear only when policy returns “needs approval.”</span><button className="quietButton" onClick={load}>Refresh</button></div>}
 
