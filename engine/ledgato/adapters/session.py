@@ -56,7 +56,8 @@ class SessionGrantAdapter:
         raise SessionGrantError("a session grant can only be issued from an owner approval")
 
     def execute_with_context(self, action: Action, *, agent: str,
-                             approved_by: str | None, approval_id: str | None) -> ExecutionReceipt:
+                             approved_by: str | None, approval_id: str | None,
+                             **_context: object) -> ExecutionReceipt:
         if action.tool != SESSION_GRANT_TOOL:
             raise SessionGrantError(f"unsupported session action '{action.tool}'")
         if not approved_by or not approval_id:
