@@ -6,6 +6,8 @@ non-bypassable, the governed agent must not also possess an equivalent token.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from datetime import datetime, timezone
 from typing import Any
 from urllib import error, request
 
@@ -38,6 +40,45 @@ class GitHubAdapter:
         if permissions.get("admin"):
             capabilities.add("github.repo.admin")
         return capabilities
+
+    def execute_with_context(self, action: Action, *, agent: str, approved_by: str | None,
+                             approval_id: str | None, task_id: str | None = None,
+                             grant_id: str | None = None) -> ExecutionReceipt:
+        """Merge with Ledgato's approval signed onto the merge commit.
+
+        GitHub records every merge under the token's account, so the merge
+        commit itself says which Ledgato task and approval allowed it. Only the
+        gateway knows those at execution time, which is why the agent never
+        writes them. The approved action is not changed: the message is built
+        on a copy, after the decision.
+        """
+        if action.tool != "github.pull.merge":
+            return self.execute(action)
+        number = _required_int(action.params, "pull_number")
+        via = "owner_card" if approved_by else ("grant" if grant_id else "policy")
+        signature = [("Ledgato-Task", task_id),
+                     ("Ledgato-Approval", approval_id or grant_id),
+                     ("Approved-Via", via),
+                     ("Approved-By", approved_by),
+                     ("Approved-At", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
+                     ("Reviewed-Commit", action.params.get("sha"))]
+        message = merge_message(self._pull_commits(number), action.params.get("commit_message"),
+                                [f"{key}: {value}" for key, value in signature if value])
+        receipt = self.execute(replace(action, params={**action.params, "commit_message": message}))
+        receipt.result = {**(receipt.result or {}), "commit_message": message}
+        return receipt
+
+    def _pull_commits(self, number: int) -> list[str]:
+        """The pull request's commit messages, or none if they can't be read.
+
+        Unreadable commits cost the agents' signatures, not the merge: the
+        approval TK gave is still carried out and signed.
+        """
+        try:
+            commits = self._call("GET", f"/repos/{self.repository}/pulls/{number}/commits?per_page=250")
+        except RuntimeError:
+            return []
+        return [str((item.get("commit") or {}).get("message") or "") for item in commits or []]
 
     def execute(self, action: Action) -> ExecutionReceipt:
         if action.tool == "github.pull.merge":
@@ -237,6 +278,32 @@ class GitHubAdapter:
             except json.JSONDecodeError:
                 detail = {"message": raw}
             raise RuntimeError(f"GitHub {method} {path} failed ({exc.code}): {detail.get('message', raw)}") from exc
+
+
+# Commit trailers carried from a pull request's commits onto its merge commit:
+# the agents' own signatures and GitHub co-author credit.
+CARRIED_TRAILERS = ("agent-harness", "agent-model", "co-authored-by")
+
+
+def merge_message(commits: list[str], body: str | None, signature: list[str]) -> str:
+    """A squash body listing the commits, their signatures, then Ledgato's.
+
+    Setting commit_message replaces GitHub's default squash body, which is
+    where the agents' trailers would otherwise survive, so they are carried
+    here. Any Ledgato-* or Approved-* line an agent wrote is dropped: only the
+    gateway signs an approval.
+    """
+    carried: list[str] = []
+    for message in commits:
+        for line in message.strip().splitlines():
+            key = line.partition(":")[0].strip().lower()
+            if key in CARRIED_TRAILERS and line.strip() not in carried:
+                carried.append(line.strip())
+    if body is None:
+        body = "\n".join(f"* {message.strip().splitlines()[0]}" for message in commits if message.strip())
+    kept = [line for line in str(body).splitlines()
+            if not line.partition(":")[0].strip().lower().startswith(("ledgato-", "approved-"))]
+    return "\n".join(part for part in ("\n".join(kept).strip(), "\n".join(carried + signature)) if part)
 
 
 def _required_int(params: dict[str, Any], key: str) -> int:
