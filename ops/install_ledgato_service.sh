@@ -50,21 +50,30 @@ SERVER_RE='^(export[[:space:]]+)?(LEDGATO_PRINCIPALS|LEDGATO_API_KEY|LEDGATO_GIT
 APPROVER_RE='^(export[[:space:]]+)?(AGENT_OS_LEDGATO_APPROVER_[A-Z0-9_]+|LEDGATO_APPROVER_[A-Z0-9_]+)='
 
 # 0. The code ledgato.service runs is $SOURCE/engine: verify that tree, not
-#    just wherever this script happens to sit.
+#    just wherever this script sits. Every file, .git included, must be
+#    root-owned and writable only by root BEFORE root runs git there: a
+#    writable .git/config or hook would control those git commands.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-[[ "$(git -C "${SCRIPT_DIR}/.." rev-parse --show-toplevel)" == "${SOURCE}" ]] \
+[[ "${SCRIPT_DIR}" == "${SOURCE}/ops" ]] \
   || { echo "run this from ${SOURCE}/ops, the checkout the service executes" >&2; exit 1; }
-[[ "$(stat -c '%u' "${SOURCE}")" -eq 0 ]] || { echo "${SOURCE} must be root-owned" >&2; exit 1; }
-[[ "$(git -C "${SOURCE}" remote get-url origin)" == "https://github.com/tk-ap/ledgato.git" ]] \
-  || { echo "${SOURCE} has an unexpected origin" >&2; exit 1; }
-[[ "$(git -C "${SOURCE}" branch --show-current)" == "main" ]] || { echo "${SOURCE} must be on main" >&2; exit 1; }
-[[ -z "$(git -C "${SOURCE}" status --porcelain)" ]] || { echo "${SOURCE} must be clean" >&2; exit 1; }
-git -C "${SOURCE}" fetch --quiet --prune origin main
-[[ "$(git -C "${SOURCE}" rev-parse HEAD)" == "$(git -C "${SOURCE}" rev-parse origin/main)" ]] \
-  || { echo "${SOURCE} is not at origin/main; pull --ff-only first" >&2; exit 1; }
-writable="$(find "${SOURCE}" -path "${SOURCE}/.git" -prune -o \( ! -user root -o -perm /022 \) -print -quit)"
+writable="$(find "${SOURCE}" \( ! -user root -o -perm /022 \) -print -quit)"
 [[ -z "${writable}" ]] || { echo "not root-only-writable: ${writable}" >&2; exit 1; }
-echo "code: ${SOURCE} at $(git -C "${SOURCE}" rev-parse --short HEAD), root-owned, clean, origin/main"
+# Even so, run root's git with no hooks, no fsmonitor and no global/system config.
+rgit() {
+  GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null HOME=/nonexistent \
+    git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c safe.directory="${SOURCE}" \
+    -C "${SOURCE}" "$@"
+}
+[[ "$(rgit remote get-url origin)" == "https://github.com/tk-ap/ledgato.git" ]] \
+  || { echo "${SOURCE} has an unexpected origin" >&2; exit 1; }
+[[ "$(rgit branch --show-current)" == "main" ]] || { echo "${SOURCE} must be on main" >&2; exit 1; }
+[[ -z "$(rgit status --porcelain)" ]] || { echo "${SOURCE} must be clean" >&2; exit 1; }
+rgit fetch --quiet --prune origin main
+[[ "$(rgit rev-parse HEAD)" == "$(rgit rev-parse origin/main)" ]] \
+  || { echo "${SOURCE} is not at origin/main; pull --ff-only first" >&2; exit 1; }
+writable="$(find "${SOURCE}" \( ! -user root -o -perm /022 \) -print -quit)"
+[[ -z "${writable}" ]] || { echo "not root-only-writable after fetch: ${writable}" >&2; exit 1; }
+echo "code: ${SOURCE} at $(rgit rev-parse --short HEAD), root-owned, clean, origin/main"
 
 if ss -ltnH 'sport = :8000' | grep -q .; then
   echo "something is still listening on 127.0.0.1:8000." >&2
@@ -101,8 +110,13 @@ same_state() {  # same_state A B: every state item identical in both
 if [[ -d "${OLD_STATE}" ]]; then
   STAGE="$(mktemp -d /var/lib/ledgato/state.staging.XXXXXX)"
   for item in "${STATE_ITEMS[@]}"; do
-    [[ -e "${OLD_STATE}/${item}" ]] && cp -a "${OLD_STATE}/${item}" "${STAGE}/"
+    # -P: copy a symlink as a symlink (then refused below), never follow it.
+    [[ -e "${OLD_STATE}/${item}" || -L "${OLD_STATE}/${item}" ]] && cp -a -P "${OLD_STATE}/${item}" "${STAGE}/"
   done
+  # The owner's state was agent-writable: refuse links, devices, FIFOs and
+  # sockets. Checked on the root-only staging copy, so it can't change after.
+  odd="$(find "${STAGE}" -mindepth 1 ! -type f ! -type d -print -quit)"
+  [[ -z "${odd}" ]] || { rm -rf -- "${STAGE}"; echo "state contains a link or special file (${odd#"${STAGE}"/}); nothing changed" >&2; exit 1; }
   same_state "${OLD_STATE}" "${STAGE}" || { rm -rf -- "${STAGE}"; echo "state copy does not match; nothing changed" >&2; exit 1; }
   if [[ -d "${STATE}" && -n "$(ls -A "${STATE}")" ]]; then
     same_state "${OLD_STATE}" "${STATE}" || { rm -rf -- "${STAGE}"; echo "${STATE} exists and differs from the owner's state; resolve by hand" >&2; exit 1; }

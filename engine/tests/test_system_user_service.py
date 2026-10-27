@@ -67,3 +67,35 @@ def test_the_code_the_unit_runs_is_the_code_that_was_verified():
     assert 'SOURCE="/var/lib/ledgato/source"' in text
     assert "PYTHONPATH=/var/lib/ledgato/source/engine" in UNIT
     assert "! -user root -o -perm /022" in text
+
+
+def test_no_root_git_runs_before_the_whole_tree_is_checked():
+    """Codex re-review of 6bd8ae1: .git was excluded from the check, and git ran first."""
+    text = INSTALLER.read_text()
+    body = text.split("# 0. The code ledgato.service runs", 1)[1]
+    first_check = _position(body, "! -user root -o -perm /022")
+    first_git = min(_position(body, "rgit remote"), _position(body, "rgit fetch"))
+    assert first_check < first_git
+    assert "-prune" not in body.split("rgit()", 1)[0], "part of the tree is skipped"
+    assert "rev-parse --show-toplevel" not in text
+    assert "core.hooksPath=/dev/null" in text and "core.fsmonitor=false" in text
+    assert re.search(r"(?m)^\s*git -C", text) is None, "a root git call bypasses rgit"
+
+
+def test_links_and_special_files_in_the_old_state_are_refused():
+    text = INSTALLER.read_text()
+    assert "cp -a -P" in text
+    check = _position(text, "! -type f ! -type d")
+    assert check < _position(text, 'mv -T "${STAGE}" "${STATE}"')
+    assert check < _position(text, 'chown -R ledgato:ledgato "${STATE}"')
+
+
+def test_the_installer_refuses_a_linked_state_item_when_run(tmp_path):
+    """Run the staging check itself against a state dir holding a symlinked ledger."""
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    (stage / "agentos-workspace-keys").mkdir()
+    (stage / "agentos-workspace-ledger.jsonl").symlink_to("/etc/passwd")
+    found = subprocess.run(["find", str(stage), "-mindepth", "1", "!", "-type", "f", "!", "-type", "d",
+                            "-print", "-quit"], capture_output=True, text=True, check=True).stdout
+    assert found.strip().endswith("agentos-workspace-ledger.jsonl")
