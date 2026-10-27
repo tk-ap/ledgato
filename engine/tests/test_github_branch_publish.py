@@ -133,3 +133,40 @@ def test_a_bundle_that_only_adds_to_a_published_branch_resolves(world):
     head = git("rev-parse", "HEAD", cwd=work)
     publish(adapter, path, head=head)
     assert git("rev-parse", "refs/heads/claude/fix", cwd=remote) == head
+
+
+def test_force_is_refused(world):
+    adapter, work, inbox, remote = world
+    path = bundle(work, inbox)
+    with pytest.raises(ValueError, match="force"):
+        publish(adapter, path, head=git("rev-parse", "HEAD", cwd=work), force=True)
+
+
+def test_swapping_the_inbox_file_after_the_check_cannot_change_what_is_pushed(world, monkeypatch):
+    """Codex review of 6cff4fa: the inbox path was re-read by git after it was checked."""
+    adapter, work, inbox, remote = world
+    head = git("rev-parse", "HEAD", cwd=work)
+    path = bundle(work, inbox)
+    declared = hashlib.sha256(path.read_bytes()).hexdigest()
+    real_git = adapter._git
+    swapped = []
+
+    def git_then_swap(args, env, *rest, **kw):
+        if not swapped:
+            swapped.append(True)
+            path.write_bytes(b"not a bundle")  # the agent replaces the file mid-flight
+        return real_git(args, env, *rest, **kw)
+
+    monkeypatch.setattr(adapter, "_git", git_then_swap)
+    receipt = publish(adapter, path, head=head, sha=declared)
+    assert receipt.executed and git("rev-parse", "refs/heads/claude/fix", cwd=remote) == head
+    assert list((adapter.mirror.parent / "bundles").iterdir()) == []
+
+
+def test_a_fifo_in_the_inbox_is_refused(world):
+    import os
+    adapter, work, inbox, _ = world
+    fifo = inbox / "pipe.bundle"
+    os.mkfifo(fifo)
+    with pytest.raises(ValueError, match="regular file"):
+        publish(adapter, fifo, head="1" * 40, sha="0" * 64)

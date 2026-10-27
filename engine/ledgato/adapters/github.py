@@ -10,7 +10,9 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 from urllib import error, request
@@ -100,15 +102,11 @@ class GitHubAdapter:
             raise ValueError(f"refusing to publish branch {branch!r}")
         if not re.fullmatch(r"[0-9a-f]{40}", head):
             raise ValueError("head must be the full 40-character commit")
-        bundle = Path(str(params.get("bundle") or ""))
-        inbox = self.inbox.resolve()
-        if bundle.is_symlink() or bundle.resolve().parent != inbox or not bundle.is_file():
-            raise ValueError("the bundle must be a regular file directly in the gateway inbox")
-        if bundle.stat().st_size > MAX_BUNDLE_BYTES:
-            raise ValueError("bundle is too large")
-        data = bundle.read_bytes()
-        if hashlib.sha256(data).hexdigest() != str(params.get("sha256") or ""):
-            raise ValueError("bundle does not match the declared sha256")
+        if params.get("force"):
+            # Rewriting a branch is not routine work; v1 only adds to one.
+            raise ValueError("force-publishing a branch is not allowed")
+        bundle = self._take_bundle(Path(str(params.get("bundle") or "")),
+                                   str(params.get("sha256") or ""))
         try:
             env = self._git_env()
             if not (self.mirror / "HEAD").exists():
@@ -124,15 +122,53 @@ class GitHubAdapter:
                 raise ValueError("the bundle must carry exactly the declared branch at the declared head")
             self._git(["bundle", "verify", "--quiet", str(bundle)], env)
             self._git(["fetch", "--quiet", str(bundle), f"+refs/heads/{branch}:refs/ledgato/{branch}"], env)
-            push = ["push", "--quiet", self.git_url, f"{head}:refs/heads/{branch}"]
-            if params.get("force") is True:
-                push.insert(1, "--force")
-            self._git(push, env)
+            # Never forced: a branch only moves forward through the gateway.
+            self._git(["push", "--quiet", self.git_url, f"{head}:refs/heads/{branch}"], env)
         finally:
             bundle.unlink(missing_ok=True)
         return ExecutionReceipt(adapter=self.name, action=action.tool, executed=True,
                                 status="published", external_id=head,
                                 result={"branch": branch, "head": head})
+
+    def _take_bundle(self, given: Path, sha256: str) -> Path:
+        """Copy the agent's bundle into a gateway-private file, once, and check that copy.
+
+        The inbox is agent-writable, so the path could be swapped after any
+        check made on it. Read it through one descriptor that refuses
+        symlinks, keep those bytes in a file only the gateway can reach, and
+        let git see only that file.
+        """
+        if given.name in {"", ".", ".."} or given.parent.resolve() != self.inbox.resolve():
+            raise ValueError("the bundle must be a regular file directly in the gateway inbox")
+        try:
+            fd = os.open(given, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+        except OSError as exc:
+            raise ValueError("the bundle must be a regular file directly in the gateway inbox") from exc
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode):
+                raise ValueError("the bundle must be a regular file directly in the gateway inbox")
+            if info.st_size > MAX_BUNDLE_BYTES:
+                raise ValueError("bundle is too large")
+            chunks, size = [], 0
+            while chunk := os.read(fd, 1 << 20):
+                size += len(chunk)
+                if size > MAX_BUNDLE_BYTES:
+                    raise ValueError("bundle is too large")
+                chunks.append(chunk)
+        finally:
+            os.close(fd)
+            given.unlink(missing_ok=True)
+        data = b"".join(chunks)
+        if hashlib.sha256(data).hexdigest() != sha256:
+            raise ValueError("bundle does not match the declared sha256")
+        private = self.mirror.parent / "bundles"
+        private.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(private, 0o700)
+        fd, name = tempfile.mkstemp(suffix=".bundle", dir=private)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+        return Path(name)
 
     def _git_env(self) -> dict[str, str]:
         # The token goes in the environment, never the command line, which
