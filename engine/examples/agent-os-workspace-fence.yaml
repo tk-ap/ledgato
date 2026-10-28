@@ -16,6 +16,10 @@ policies:
       - host.agentos.runtime.activate
       - ledgato.session.grant
       - github.pull.merge
+      # Agents' own GitHub credential is read-only on agent-os; their branches
+      # reach a pull request through the gateway. Allowed without a card: the
+      # adapter refuses main and every ref but the one declared branch.
+      - github.branch.publish
     approve_tool:
       - host.agentos.runtime.activate
       # Merges into tk-ap/agent-os go through Ledgato's GitHub adapter (the

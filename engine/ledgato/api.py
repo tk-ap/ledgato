@@ -908,6 +908,7 @@ def _default_adapters_from_env() -> dict[str, EnforcementAdapter]:
             repository=repository,
             token=token,
             api_url=os.getenv("LEDGATO_GITHUB_API_URL"),
+            inbox=os.getenv("LEDGATO_GITHUB_INBOX"),
         )
 
     host_enabled = (os.getenv("LEDGATO_HOST_OP_ENABLED") or "").strip().lower()

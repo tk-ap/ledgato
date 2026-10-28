@@ -481,7 +481,8 @@ class EnforcementGateway:
             # Adapters whose effect depends on who approved (session grants)
             # get that context; approved_by is set only on the resume path.
             receipt: ExecutionReceipt = execute_with_context(
-                action, agent=agent, approved_by=approved_by, approval_id=approval_id)
+                action, agent=agent, approved_by=approved_by, approval_id=approval_id,
+                task_id=task_id, grant_id=getattr(grant, "id", None))
         else:
             receipt = target.execute(action)
         verification = target.verify(action, receipt)
