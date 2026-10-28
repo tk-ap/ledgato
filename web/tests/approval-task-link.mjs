@@ -38,4 +38,6 @@ if (!ui.includes('pickApproval(state.approvals,linkedTask(location.search))')) f
 if (!ui.includes('decide(approval.id,')) fail('decisions must still post the selected approval\'s own id')
 if (!ui.includes("This approval link is invalid.")) fail('invalid links must be visible to the owner')
 
+if (!ui.includes("state.kind==='connected'&&waiting===0&&")) fail('an invalid or ambiguous link must not claim there are no pending approvals')
+if (!ui.includes('waiting>0?')) fail('the heading must count pending approvals, not the selected one')
 console.log('approval-task-link: ok')

@@ -312,7 +312,7 @@ function ProgressiveAuthorityPanel(){
     <div className="pocSectionHead">
       <div>
         <span className="pocKicker">WHAT NEEDS YOU</span>
-        <h2>{approval?(waiting>1?`${waiting} consequential actions are waiting for a decision.`:'One consequential action is waiting for a decision.'):'Nothing needs you right now.'}</h2>
+        <h2>{waiting>0?(waiting>1?`${waiting} consequential actions are waiting for a decision.`:'One consequential action is waiting for a decision.'):'Nothing needs you right now.'}</h2>
       </div>
       <span className={'pocBadge '+(state.kind==='connected'?'verified':'pending')}>
         {state.kind==='connected'?'OWNER + ENGINE':'CONTROL STATUS'}
@@ -331,7 +331,7 @@ function ProgressiveAuthorityPanel(){
 
     {state.kind==='connected'&&missing&&<div className="pocEmptyAction"><strong>No pending approval for task <code>{linked}</code></strong><span>It may already be decided or expired. {approval?'Showing the next action that is waiting instead.':''}</span></div>}
 
-    {state.kind==='connected'&&!approval&&<div className="pocEmptyAction"><strong>No pending approvals</strong><span>Configured boundaries continue running without this page open. You appear only when policy returns “needs approval.”</span><button className="quietButton" onClick={load}>Refresh</button></div>}
+    {state.kind==='connected'&&waiting===0&&<div className="pocEmptyAction"><strong>No pending approvals</strong><span>Configured boundaries continue running without this page open. You appear only when policy returns “needs approval.”</span><button className="quietButton" onClick={load}>Refresh</button></div>}
 
     {state.kind==='connected'&&approval&&<article className="authorityPrompt">
       <div className="authorityPromptMain">
