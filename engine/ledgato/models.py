@@ -104,6 +104,9 @@ class Policy:
     approval_tools: set[str] = field(default_factory=set)
     approval_impact_min: Optional[str] = None
     require_grant: bool = False
+    #: Domains where every approval-gated action needs its own owner card: an
+    #: owner session grant never stands in for one (engine.evaluate_action).
+    card_only_domains: list[str] = field(default_factory=list)
 
     def impact_max_severity(self) -> int:
         return IMPACTS.get(self.impact_max, 3)
@@ -124,6 +127,7 @@ class Policy:
             "approval_tools": sorted(self.approval_tools),
             "approval_impact_min": self.approval_impact_min,
             "require_grant": self.require_grant,
+            "card_only_domains": list(self.card_only_domains),
         }
 
 
@@ -140,6 +144,7 @@ _POLICY_KEYS = {
     "on_deny",
     "approval_impact_min",
     "require_grant",
+    "card_only_domains",
 }
 
 
@@ -198,6 +203,7 @@ def parse_policy(data: dict[str, Any]) -> Policy:
         ),
         approval_impact_min=data.get("approval_impact_min"),
         require_grant=bool(data.get("require_grant", False)),
+        card_only_domains=_as_list(data.get("card_only_domains")),
     )
 
 

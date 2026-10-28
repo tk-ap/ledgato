@@ -38,6 +38,12 @@ policies:
       - ashwood-host-01
       - ledgato-session::*
       - tk-ap/agent-os
+      # Ledgato's own repository, through the github:tk-ap/ledgato adapter.
+      - tk-ap/ledgato
+    # Changes to Ledgato itself: one owner card per merge. A session grant
+    # never covers them (TK, 2026-10-28).
+    card_only_domains:
+      - tk-ap/ledgato
     on_deny:
       - alert
       - human_review

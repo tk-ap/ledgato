@@ -47,7 +47,7 @@ def bundle(work, inbox, ref="claude/fix", name="x.bundle"):
 def publish(adapter, path, branch="claude/fix", head=None, sha=None, **extra):
     params = {"branch": branch, "bundle": str(path), "head": head,
               "sha256": sha or hashlib.sha256(path.read_bytes()).hexdigest(), **extra}
-    return adapter.execute(Action(tool="github.branch.publish", impact="write", params=params))
+    return adapter.execute(Action(tool="github.branch.publish", impact="write", domain="owner/repo", params=params))
 
 
 def test_a_branch_is_published_from_its_bundle(world):
@@ -177,7 +177,7 @@ def test_publishing_works_through_the_gateways_context_path(world):
     adapter, work, inbox, remote = world
     head = git("rev-parse", "HEAD", cwd=work)
     path = bundle(work, inbox)
-    action = Action(tool="github.branch.publish", impact="write", params={
+    action = Action(tool="github.branch.publish", impact="write", domain="owner/repo", params={
         "branch": "claude/fix", "bundle": str(path), "head": head,
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     receipt = adapter.execute_with_context(action, agent="agent-os", approved_by=None,

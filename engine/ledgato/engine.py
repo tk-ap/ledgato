@@ -118,11 +118,17 @@ def evaluate_action(
         action.tool in policy.approval_tools
         or (approval_min is not None and action.severity() >= approval_min)
     )
+    card_only = bool(action.domain) and _domain_allowed(action.domain, policy.card_only_domains)
     if approval_needed and not approval_satisfied and grant is not None and grant.satisfies_approval:
-        # Only reachable after _check_grant above passed: the owner-approved
-        # session grant covers this exact tool, domain, impact and is active.
-        approval_satisfied = True
-        reasons.append(f"owner session grant '{grant.id}' satisfies approval")
+        if card_only:
+            # Changes to the gatekeeper itself: the owner sees each one.
+            reasons.append(f"domain '{action.domain}' needs an owner card per action; "
+                           f"session grant '{grant.id}' does not cover it")
+        else:
+            # Only reachable after _check_grant above passed: the owner-approved
+            # session grant covers this exact tool, domain, impact and is active.
+            approval_satisfied = True
+            reasons.append(f"owner session grant '{grant.id}' satisfies approval")
     if approval_needed and not approval_satisfied:
         reasons.append("policy requires approval for this consequential crossing")
         return _decision(APPROVE, "APPROVE: human or higher-order approval required", reasons, policy, grant)

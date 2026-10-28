@@ -173,7 +173,36 @@ def test_agentos_fence_merges_need_the_owner_or_a_session():
                              satisfies_approval=True)
     assert evaluate_action(policy, merge, grant=session).outcome == "ALLOW"
 
-    elsewhere = Action(tool="github.pull.merge", impact="write", domain="tk-ap/ledgato",
+    elsewhere = Action(tool="github.pull.merge", impact="write", domain="tk-ap/alvira",
                        params={"pull_number": 1})
     assert evaluate_action(policy, elsewhere).outcome == "DENY"
     assert evaluate_action(policy, elsewhere, grant=session).outcome == "DENY"
+
+
+def test_ledgato_merges_need_an_owner_card_even_inside_a_session():
+    """Ledgato's own repository: one card per merge, never a session (TK, 2026-10-28)."""
+    from pathlib import Path
+
+    import yaml
+
+    from ledgato.engine import evaluate_action
+    from ledgato.models import AuthorityGrant, load_policies
+
+    source = Path(__file__).resolve().parents[1] / "examples" / "agent-os-workspace-fence.yaml"
+    policy = load_policies(yaml.safe_load(source.read_text()))["agent-os-workspace"]
+    merge = Action(tool="github.pull.merge", impact="write", domain="tk-ap/ledgato",
+                   params={"pull_number": 1})
+    assert evaluate_action(policy, merge).outcome == "APPROVE"
+    expiry = (utcnow() + timedelta(hours=1)).isoformat()
+    for domains in (["tk-ap/ledgato"], ["tk-ap/*"]):
+        session = AuthorityGrant(id="grant_s", agent="agent-os-workspace",
+                                 granted_by="owner-session:tk", purpose="session",
+                                 tools={"github.pull.merge"}, data_domains=domains,
+                                 impact_max="write", expires_at=expiry, satisfies_approval=True)
+        decision = evaluate_action(policy, merge, grant=session)
+        assert decision.outcome == "APPROVE", domains
+        assert any("needs an owner card" in reason for reason in decision.reasons)
+    # Branch publishing stays card-free there too: it never touches main.
+    publish = Action(tool="github.branch.publish", impact="write", domain="tk-ap/ledgato",
+                     params={"branch": "claude/x"})
+    assert evaluate_action(policy, publish).outcome == "ALLOW"

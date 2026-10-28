@@ -35,7 +35,7 @@ def _merge(monkeypatch, commits=COMMITS, params=None, **context):
         raise AssertionError((method, path))
 
     monkeypatch.setattr(adapter, "_call", fake_call)
-    action = Action(tool=MERGE, impact="write",
+    action = Action(tool=MERGE, impact="write", domain="owner/repo",
                     params=params or {"pull_number": 7, "merge_method": "squash", "sha": SHA,
                                       "signature": "ledgato"})
     defaults = {"agent": "agent-os", "approved_by": None, "approval_id": None,
@@ -119,7 +119,7 @@ def _verify(monkeypatch, landed_message):
     monkeypatch.setattr(adapter, "_call_status", lambda *a, **k: 204)
     receipt = ExecutionReceipt(adapter="github", action=MERGE, executed=True, status="merged",
                                external_id="m" * 40, result={"signature_trailers": trailers})
-    return adapter.verify(Action(tool=MERGE, impact="write", params={"pull_number": 7}), receipt)
+    return adapter.verify(Action(tool=MERGE, impact="write", domain="owner/repo", params={"pull_number": 7}), receipt)
 
 
 def test_verification_requires_the_signature_on_githubs_copy(monkeypatch):
@@ -131,3 +131,23 @@ def test_verification_requires_the_signature_on_githubs_copy(monkeypatch):
     forged = _verify(monkeypatch, "Fix (#7)\n\nLedgato-Task: agentos-merge-pr-7\n"
                                   "Ledgato-Approval: approval_other")
     assert not forged["verified"]
+
+
+@pytest.mark.parametrize("domain", [None, "tk-ap/ledgato", "owner/repo-other"])
+def test_an_action_for_another_repository_is_refused(domain):
+    """Policy scopes merges by domain, so the adapter only acts on its own repository."""
+    adapter = GitHubAdapter(repository="owner/repo", token="test-token")
+
+    def no_call(*_args, **_kwargs):
+        raise AssertionError("GitHub was called")
+
+    adapter._call = no_call
+    for tool, params in ((MERGE, {"pull_number": 7, "sha": SHA, "signature": "ledgato"}),
+                         ("github.branch.publish", {"branch": "claude/x"}),
+                         ("github.issue.comment", {"issue_number": 7, "body": "hi"})):
+        action = Action(tool=tool, impact="write", domain=domain, params=params)
+        with pytest.raises(ValueError, match="not this adapter's repository"):
+            adapter.execute_with_context(action, agent="agent-os", approved_by="tk",
+                                         approval_id="approval_1")
+        with pytest.raises(ValueError, match="not this adapter's repository"):
+            adapter.execute(action)

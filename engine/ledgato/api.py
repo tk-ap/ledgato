@@ -910,6 +910,20 @@ def _default_adapters_from_env() -> dict[str, EnforcementAdapter]:
             api_url=os.getenv("LEDGATO_GITHUB_API_URL"),
             inbox=os.getenv("LEDGATO_GITHUB_INBOX"),
         )
+        # Further repositories under the same token, one adapter each, named
+        # github:<owner/name>. The adapter refuses actions whose domain isn't
+        # its own repository, so policy scopes them by domain.
+        for extra in (os.getenv("LEDGATO_GITHUB_EXTRA_REPOSITORIES") or "").split(","):
+            extra = extra.strip()
+            if not extra or extra == repository:
+                continue
+            adapters[f"github:{extra}"] = GitHubAdapter(
+                repository=extra,
+                token=token,
+                api_url=os.getenv("LEDGATO_GITHUB_API_URL"),
+                inbox=os.getenv("LEDGATO_GITHUB_INBOX"),
+                name=f"github:{extra}",
+            )
 
     host_enabled = (os.getenv("LEDGATO_HOST_OP_ENABLED") or "").strip().lower()
     if host_enabled in {"1", "true", "yes", "on"}:

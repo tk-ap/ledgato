@@ -63,6 +63,22 @@ The proof policy explicitly denies `github.pull.merge`. A passing run means:
 
 This is safe to run against an open PR because the proof path contains no allowed merge call.
 
+## More than one repository
+
+`LEDGATO_GITHUB_REPOSITORY` names the repository of the `github` adapter.
+`LEDGATO_GITHUB_EXTRA_REPOSITORIES` (comma-separated) adds one adapter per
+further repository, named `github:<owner/name>`, under the same
+`LEDGATO_GITHUB_TOKEN`. Every GitHub adapter refuses an action whose `domain`
+is not its own repository, so a policy's `data_domains` and a grant's domains
+decide which repository an approval covers.
+
+A policy's `card_only_domains` lists domains where each approval-gated action
+needs its own owner card: an owner session grant never covers them, even one
+whose domains match. The AgentOS fence uses it for `tk-ap/ledgato`, so every
+merge into Ledgato itself is shown to the owner. If Ledgato is down, the
+owner's own GitHub login is the break-glass route for its repository, and
+such a merge shows up in the audit with no receipt.
+
 ## Production caveat
 
 v0.3.0 is the enforcement **foundation and first-client proof slice**, not a claim that every agent platform or external service is already integrated. Each additional protected system needs either:
