@@ -263,7 +263,10 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         "ashwood-host-01",
         "ledgato-session::*",
         "tk-ap/agent-os",
+        "tk-ap/ledgato",
     ]
+    assert policy["card_only_domains"] == ["tk-ap/ledgato"]
+    assert policy["card_free_tools"] == ["github.branch.publish"]
 
     cfg = tmp_path / "fence.yaml"
     cfg.write_text(source.read_text())
@@ -353,6 +356,20 @@ def test_default_github_adapter_never_inherits_generic_github_token(monkeypatch)
     monkeypatch.setenv("LEDGATO_GITHUB_TOKEN", "ledgato-only-token")
     adapters = _default_adapters_from_env()
     assert adapters["github"].token == "ledgato-only-token"
+
+
+def test_extra_github_repositories_each_get_their_own_adapter(monkeypatch):
+    monkeypatch.setenv("LEDGATO_GITHUB_REPOSITORY", "tk-ap/agent-os")
+    monkeypatch.setenv("LEDGATO_GITHUB_TOKEN", "ledgato-only-token")
+    monkeypatch.setenv("LEDGATO_GITHUB_EXTRA_REPOSITORIES", " tk-ap/ledgato, ,tk-ap/agent-os")
+    adapters = _default_adapters_from_env()
+    github = sorted(name for name in adapters if name.startswith("github"))
+    assert github == ["github", "github:tk-ap/ledgato"]
+    ledgato = adapters["github:tk-ap/ledgato"]
+    assert (ledgato.repository, ledgato.name, ledgato.boundary_resource) == (
+        "tk-ap/ledgato", "github:tk-ap/ledgato", "tk-ap/ledgato")
+    assert ledgato.mirror != adapters["github"].mirror
+    assert adapters["github"].name == "github"
 
 
 def test_agentos_runtime_fence_requires_approval_for_supported_github_mutations(tmp_path):

@@ -29,9 +29,12 @@ class GitHubAdapter:
     is_live_provider = True
 
     def __init__(self, *, repository: str, token: str, api_url: str | None = None,
-                 inbox: str | None = None, mirror: str | None = None, git_url: str | None = None):
+                 inbox: str | None = None, mirror: str | None = None, git_url: str | None = None,
+                 name: str | None = None):
         if "/" not in repository:
             raise ValueError("repository must be owner/name")
+        if name:
+            self.name = name
         self.repository = repository
         self.boundary_resource = repository
         self.token = token
@@ -74,6 +77,7 @@ class GitHubAdapter:
         """
         if action.tool != "github.pull.merge":
             return self.execute(action)
+        self._require_own_repository(action)
         if action.params.get("signature") != SIGNATURE:
             raise ValueError("a merge must be approved as signed (params.signature = 'ledgato')")
         if action.params.get("merge_method") == "rebase":
@@ -106,7 +110,19 @@ class GitHubAdapter:
             return []
         return [str((item.get("commit") or {}).get("message") or "") for item in commits or []]
 
+    def _require_own_repository(self, action: Action) -> None:
+        """The approved domain must be this adapter's repository.
+
+        Policy and grants are scoped by domain, and each repository has its
+        own adapter. An action naming another repository, or none, could be
+        approved under one scope and carried out in another.
+        """
+        if action.domain != self.repository:
+            raise ValueError(f"action domain {action.domain!r} is not this adapter's "
+                             f"repository {self.repository!r}")
+
     def execute(self, action: Action) -> ExecutionReceipt:
+        self._require_own_repository(action)
         if action.tool == "github.pull.merge":
             number = _required_int(action.params, "pull_number")
             body: dict[str, Any] = {}
