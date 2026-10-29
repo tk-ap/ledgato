@@ -114,11 +114,14 @@ def evaluate_action(
         reasons.append(f"grant '{grant.id}' active and in scope")
 
     approval_min = policy.approval_min_severity()
+    card_only = bool(action.domain) and _domain_allowed(action.domain, policy.card_only_domains)
     approval_needed = (
         action.tool in policy.approval_tools
         or (approval_min is not None and action.severity() >= approval_min)
+        # In a card-only domain the card is the default, not something
+        # approval_tools has to remember: only an explicit exemption skips it.
+        or (card_only and action.tool not in policy.card_free_tools)
     )
-    card_only = bool(action.domain) and _domain_allowed(action.domain, policy.card_only_domains)
     if approval_needed and not approval_satisfied and grant is not None and grant.satisfies_approval:
         if card_only:
             # Changes to the gatekeeper itself: the owner sees each one.

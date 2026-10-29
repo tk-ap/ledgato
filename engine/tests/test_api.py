@@ -266,6 +266,7 @@ def test_agentos_workspace_dispatch_example_is_narrow_and_allows_declared_crossi
         "tk-ap/ledgato",
     ]
     assert policy["card_only_domains"] == ["tk-ap/ledgato"]
+    assert policy["card_free_tools"] == ["github.branch.publish"]
 
     cfg = tmp_path / "fence.yaml"
     cfg.write_text(source.read_text())

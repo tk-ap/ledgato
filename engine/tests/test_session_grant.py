@@ -206,3 +206,32 @@ def test_ledgato_merges_need_an_owner_card_even_inside_a_session():
     publish = Action(tool="github.branch.publish", impact="write", domain="tk-ap/ledgato",
                      params={"branch": "claude/x"})
     assert evaluate_action(policy, publish).outcome == "ALLOW"
+
+
+def test_a_card_only_domain_needs_the_card_even_if_approve_tool_forgets_it():
+    """Codex review of #109: the card can't depend on approve_tool listing the merge."""
+    from ledgato.engine import evaluate_action
+    from ledgato.models import AuthorityGrant, parse_policy
+
+    policy = parse_policy({"agent": "a", "allow_tool": ["github.pull.merge", "github.branch.publish",
+                                                        "github.issue.comment"],
+                           "impact_max": "write", "data_domains": ["tk-ap/*"],
+                           "card_only_domains": ["tk-ap/ledgato"],
+                           "card_free_tools": ["github.branch.publish"]})
+    session = AuthorityGrant(id="grant_s", agent="a", granted_by="owner-session:tk",
+                             purpose="session", tools={"github.pull.merge"},
+                             data_domains=["tk-ap/*"], impact_max="write",
+                             expires_at=(utcnow() + timedelta(hours=1)).isoformat(),
+                             satisfies_approval=True)
+    for tool in ("github.pull.merge", "github.issue.comment"):
+        held = Action(tool=tool, impact="write", domain="tk-ap/ledgato", params={})
+        assert evaluate_action(policy, held).outcome == "APPROVE", tool
+    merge = Action(tool="github.pull.merge", impact="write", domain="tk-ap/ledgato", params={})
+    assert evaluate_action(policy, merge, grant=session).outcome == "APPROVE"
+    # The owner's card, once given, carries it.
+    assert evaluate_action(policy, merge, approval_satisfied=True).outcome == "ALLOW"
+    publish = Action(tool="github.branch.publish", impact="write", domain="tk-ap/ledgato", params={})
+    assert evaluate_action(policy, publish).outcome == "ALLOW"
+    # Outside the card-only domain nothing changes.
+    other = Action(tool="github.pull.merge", impact="write", domain="tk-ap/agent-os", params={})
+    assert evaluate_action(policy, other).outcome == "ALLOW"

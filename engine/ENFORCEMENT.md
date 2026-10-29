@@ -72,9 +72,10 @@ further repository, named `github:<owner/name>`, under the same
 is not its own repository, so a policy's `data_domains` and a grant's domains
 decide which repository an approval covers.
 
-A policy's `card_only_domains` lists domains where each approval-gated action
-needs its own owner card: an owner session grant never covers them, even one
-whose domains match. The AgentOS fence uses it for `tk-ap/ledgato`, so every
+A policy's `card_only_domains` lists domains where every action needs its own
+owner card, whether or not `approve_tool` lists it, unless the tool is in
+`card_free_tools`. An owner session grant never covers them, even one whose
+domains match. The AgentOS fence uses it for `tk-ap/ledgato`, so every
 merge into Ledgato itself is shown to the owner. If Ledgato is down, the
 owner's own GitHub login is the break-glass route for its repository, and
 such a merge shows up in the audit with no receipt.
